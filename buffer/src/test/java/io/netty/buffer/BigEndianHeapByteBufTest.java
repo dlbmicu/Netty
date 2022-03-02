@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,11 +15,9 @@
  */
 package io.netty.buffer;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.Assert.*;
 
 /**
  * Tests big-endian heap channel buffers
@@ -33,23 +31,13 @@ public class BigEndianHeapByteBufTest extends AbstractByteBufTest {
         return buffer;
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void shouldNotAllowNullInConstructor1() {
-        assertThrows(NullPointerException.class, new Executable() {
-            @Override
-            public void execute() {
-                new UnpooledHeapByteBuf(null, new byte[1], 0);
-            }
-        });
+        new UnpooledHeapByteBuf(null, new byte[1], 0);
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void shouldNotAllowNullInConstructor2() {
-        assertThrows(NullPointerException.class, new Executable() {
-            @Override
-            public void execute() {
-                new UnpooledHeapByteBuf(UnpooledByteBufAllocator.DEFAULT, null, 0);
-            }
-        });
+        new UnpooledHeapByteBuf(UnpooledByteBufAllocator.DEFAULT, null, 0);
     }
 }

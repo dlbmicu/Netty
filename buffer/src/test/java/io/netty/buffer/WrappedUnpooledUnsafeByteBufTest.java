@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,238 +16,98 @@
 package io.netty.buffer;
 
 import io.netty.util.internal.PlatformDependent;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.Assume;
+import org.junit.Before;
+import org.junit.Test;
 
 public class WrappedUnpooledUnsafeByteBufTest extends BigEndianUnsafeDirectByteBufTest {
 
-    @BeforeEach
+    @Before
     @Override
     public void init() {
-        Assumptions.assumeTrue(PlatformDependent.useDirectBufferNoCleaner(),
-                "PlatformDependent.useDirectBufferNoCleaner() returned false, skip tests");
+        Assume.assumeTrue("PlatformDependent.useDirectBufferNoCleaner() returned false, skip tests",
+                PlatformDependent.useDirectBufferNoCleaner());
         super.init();
     }
 
     @Override
     protected ByteBuf newBuffer(int length, int maxCapacity) {
-        Assumptions.assumeTrue(maxCapacity == Integer.MAX_VALUE);
+        Assume.assumeTrue(maxCapacity == Integer.MAX_VALUE);
 
         return new WrappedUnpooledUnsafeDirectByteBuf(UnpooledByteBufAllocator.DEFAULT,
                 PlatformDependent.allocateMemory(length), length, true);
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testInternalNioBuffer() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testInternalNioBuffer();
-            }
-        });
+        super.testInternalNioBuffer();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testDuplicateReadGatheringByteChannelMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testDuplicateReadGatheringByteChannelMultipleThreads();
-            }
-        });
+    public void testDuplicateReadGatheringByteChannelMultipleThreads() throws Exception {
+        super.testDuplicateReadGatheringByteChannelMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testSliceReadGatheringByteChannelMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testSliceReadGatheringByteChannelMultipleThreads();
-            }
-        });
+    public void testSliceReadGatheringByteChannelMultipleThreads() throws Exception {
+        super.testSliceReadGatheringByteChannelMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testDuplicateReadOutputStreamMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testDuplicateReadOutputStreamMultipleThreads();
-            }
-        });
+    public void testDuplicateReadOutputStreamMultipleThreads() throws Exception {
+        super.testDuplicateReadOutputStreamMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testSliceReadOutputStreamMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testSliceReadOutputStreamMultipleThreads();
-            }
-        });
+    public void testSliceReadOutputStreamMultipleThreads() throws Exception {
+        super.testSliceReadOutputStreamMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testDuplicateBytesInArrayMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testDuplicateBytesInArrayMultipleThreads();
-            }
-        });
+    public void testDuplicateBytesInArrayMultipleThreads() throws Exception {
+        super.testDuplicateBytesInArrayMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
-    public void testSliceBytesInArrayMultipleThreads() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() throws Exception {
-                WrappedUnpooledUnsafeByteBufTest.super.testSliceBytesInArrayMultipleThreads();
-            }
-        });
+    public void testSliceBytesInArrayMultipleThreads() throws Exception {
+        super.testSliceBytesInArrayMultipleThreads();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testNioBufferExposeOnlyRegion() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testNioBufferExposeOnlyRegion();
-            }
-        });
+        super.testNioBufferExposeOnlyRegion();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testGetReadOnlyDirectDst() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testGetReadOnlyDirectDst();
-            }
-        });
+        super.testGetReadOnlyDirectDst();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testGetReadOnlyHeapDst() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testGetReadOnlyHeapDst();
-            }
-        });
+        super.testGetReadOnlyHeapDst();
     }
 
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testReadBytes() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testReadBytes();
-            }
-        });
+        super.testReadBytes();
     }
 
-    @Test
-    @Override
-    public void testDuplicateCapacityChange() {
-        assertThrows(IllegalArgumentException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testDuplicateCapacityChange();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testRetainedDuplicateCapacityChange() {
-        assertThrows(IllegalArgumentException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testRetainedDuplicateCapacityChange();
-            }
-        });
-    }
-
-    @Test
+    @Test(expected = IndexOutOfBoundsException.class)
     @Override
     public void testLittleEndianWithExpand() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testLittleEndianWithExpand();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testWriteUsAsciiCharSequenceExpand() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testWriteUsAsciiCharSequenceExpand();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testWriteUtf8CharSequenceExpand() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testWriteUtf8CharSequenceExpand();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testWriteIso88591CharSequenceExpand() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testWriteIso88591CharSequenceExpand();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testWriteUtf16CharSequenceExpand() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testWriteUtf16CharSequenceExpand();
-            }
-        });
-    }
-
-    @Test
-    @Override
-    public void testGetBytesByteBuffer() {
-        assertThrows(IndexOutOfBoundsException.class, new Executable() {
-            @Override
-            public void execute() {
-                WrappedUnpooledUnsafeByteBufTest.super.testGetBytesByteBuffer();
-            }
-        });
+        super.testLittleEndianWithExpand();
     }
 
     @Test

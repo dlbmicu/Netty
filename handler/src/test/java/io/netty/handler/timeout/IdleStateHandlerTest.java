@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,6 +15,13 @@
  */
 package io.netty.handler.timeout;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
+
 import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
@@ -22,20 +29,13 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOutboundBuffer;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.concurrent.Future;
-import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.greaterThanOrEqualTo;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertSame;
+import org.junit.Test;
 
 public class IdleStateHandlerTest {
 
@@ -68,7 +68,8 @@ public class IdleStateHandlerTest {
     }
 
     private static void anyIdle(TestableIdleStateHandler idleStateHandler, Object... expected) throws Exception {
-        assertThat(expected.length,  greaterThanOrEqualTo(1));
+
+        assertTrue("The number of expected events must be >= 1", expected.length >= 1);
 
         final List<Object> events = new ArrayList<Object>();
         ChannelInboundHandlerAdapter handler = new ChannelInboundHandlerAdapter() {
@@ -92,7 +93,7 @@ public class IdleStateHandlerTest {
             // Compare the expected with the actual IdleStateEvents
             for (int i = 0; i < expected.length; i++) {
                 Object evt = events.get(i);
-                assertSame(expected[i], evt, "Element " + i + " is not matching");
+                assertSame("Element " + i + " is not matching", expected[i], evt);
             }
         } finally {
             channel.finishAndReleaseAll();
@@ -235,7 +236,6 @@ public class IdleStateHandlerTest {
             channel.writeAndFlush(Unpooled.wrappedBuffer(new byte[] { 1 }));
             channel.writeAndFlush(Unpooled.wrappedBuffer(new byte[] { 2 }));
             channel.writeAndFlush(Unpooled.wrappedBuffer(new byte[] { 3 }));
-            channel.writeAndFlush(Unpooled.wrappedBuffer(new byte[5 * 1024]));
 
             // Establish a baseline. We're not consuming anything and let it idle once.
             idleStateHandler.tickRun();
@@ -283,30 +283,6 @@ public class IdleStateHandlerTest {
             assertEquals(0, events.size());
             assertEquals(26L, idleStateHandler.tick(TimeUnit.SECONDS)); // 23s + 2s + 1s
 
-            // Consume part of the message every 2 seconds, then be idle for 1 seconds,
-            // then run the task and we should get an IdleStateEvent because the first trigger
-            idleStateHandler.tick(2L, TimeUnit.SECONDS);
-            assertNotNullAndRelease(channel.consumePart(1024));
-            idleStateHandler.tick(2L, TimeUnit.SECONDS);
-            assertNotNullAndRelease(channel.consumePart(1024));
-            idleStateHandler.tickRun(1L, TimeUnit.SECONDS);
-            assertEquals(1, events.size());
-            assertEquals(31L, idleStateHandler.tick(TimeUnit.SECONDS)); // 26s + 2s + 2s + 1s
-            events.clear();
-
-            // Consume part of the message every 2 seconds, then be idle for 1 seconds,
-            // then consume all the rest of the message, then run the task and we shouldn't
-            // get an IdleStateEvent because the data is flowing and we haven't been idle for long enough!
-            idleStateHandler.tick(2L, TimeUnit.SECONDS);
-            assertNotNullAndRelease(channel.consumePart(1024));
-            idleStateHandler.tick(2L, TimeUnit.SECONDS);
-            assertNotNullAndRelease(channel.consumePart(1024));
-            idleStateHandler.tickRun(1L, TimeUnit.SECONDS);
-            assertEquals(0, events.size());
-            assertEquals(36L, idleStateHandler.tick(TimeUnit.SECONDS)); // 31s + 2s + 2s + 1s
-            idleStateHandler.tick(2L, TimeUnit.SECONDS);
-            assertNotNullAndRelease(channel.consumePart(1024));
-
             // There are no messages left! Advance the ticker by 3 seconds,
             // attempt a consume() but it will be null, then advance the
             // ticker by an another 2 seconds and we should get an IdleStateEvent
@@ -316,7 +292,7 @@ public class IdleStateHandlerTest {
 
             idleStateHandler.tickRun(2L, TimeUnit.SECONDS);
             assertEquals(1, events.size());
-            assertEquals(43L, idleStateHandler.tick(TimeUnit.SECONDS)); // 36s + 2s + 3s + 2s
+            assertEquals(31L, idleStateHandler.tick(TimeUnit.SECONDS)); // 26s + 3s + 2s
 
             // q.e.d.
         } finally {
@@ -341,7 +317,7 @@ public class IdleStateHandlerTest {
 
         private long ticksInNanos;
 
-        TestableIdleStateHandler(boolean observeOutput,
+        public TestableIdleStateHandler(boolean observeOutput,
                 long readerIdleTime, long writerIdleTime, long allIdleTime,
                 TimeUnit unit) {
             super(observeOutput, readerIdleTime, writerIdleTime, allIdleTime, unit);
@@ -384,7 +360,7 @@ public class IdleStateHandlerTest {
         }
 
         @Override
-        Future<?> schedule(ChannelHandlerContext ctx, Runnable task, long delay, TimeUnit unit) {
+        ScheduledFuture<?> schedule(ChannelHandlerContext ctx, Runnable task, long delay, TimeUnit unit) {
             this.task = task;
             this.delayInNanos = unit.toNanos(delay);
             return null;
@@ -393,7 +369,7 @@ public class IdleStateHandlerTest {
 
     private static class ObservableChannel extends EmbeddedChannel {
 
-        ObservableChannel(ChannelHandler... handlers) {
+        public ObservableChannel(ChannelHandler... handlers) {
             super(handlers);
         }
 
@@ -403,32 +379,13 @@ public class IdleStateHandlerTest {
             // the messages in the ChannelOutboundBuffer.
         }
 
-        private Object consume() {
+        public Object consume() {
             ChannelOutboundBuffer buf = unsafe().outboundBuffer();
             if (buf != null) {
                 Object msg = buf.current();
                 if (msg != null) {
                     ReferenceCountUtil.retain(msg);
                     buf.remove();
-                    return msg;
-                }
-            }
-            return null;
-        }
-
-        /**
-         * Consume the part of a message.
-         *
-         * @param byteCount count of byte to be consumed
-         * @return the message currently being consumed
-         */
-        private Object consumePart(int byteCount) {
-            ChannelOutboundBuffer buf = unsafe().outboundBuffer();
-            if (buf != null) {
-                Object msg = buf.current();
-                if (msg != null) {
-                    ReferenceCountUtil.retain(msg);
-                    buf.removeBytes(byteCount);
                     return msg;
                 }
             }

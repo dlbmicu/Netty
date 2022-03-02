@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -14,8 +14,6 @@
  * under the License.
  */
 package io.netty.handler.ssl;
-
-import static io.netty.util.internal.ObjectUtil.checkNonEmpty;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -40,10 +38,17 @@ final class ApplicationProtocolUtil {
 
         List<String> result = new ArrayList<String>(initialListSize);
         for (String p : protocols) {
-            result.add(checkNonEmpty(p, "p"));
+            if (p == null || p.isEmpty()) {
+                throw new IllegalArgumentException("protocol cannot be null or empty");
+            }
+            result.add(p);
         }
 
-        return checkNonEmpty(result, "result");
+        if (result.isEmpty()) {
+            throw new IllegalArgumentException("protocols cannot empty");
+        }
+
+        return result;
     }
 
     static List<String> toList(String... protocols) {
@@ -57,9 +62,16 @@ final class ApplicationProtocolUtil {
 
         List<String> result = new ArrayList<String>(initialListSize);
         for (String p : protocols) {
-            result.add(checkNonEmpty(p, "p"));
+            if (p == null || p.isEmpty()) {
+                throw new IllegalArgumentException("protocol cannot be null or empty");
+            }
+            result.add(p);
         }
 
-        return checkNonEmpty(result, "result");
+        if (result.isEmpty()) {
+            throw new IllegalArgumentException("protocols cannot empty");
+        }
+
+        return result;
     }
 }

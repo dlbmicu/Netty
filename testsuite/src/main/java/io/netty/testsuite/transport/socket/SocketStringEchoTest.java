@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -29,13 +29,10 @@ import io.netty.handler.codec.string.StringEncoder;
 import io.netty.util.CharsetUtil;
 import io.netty.util.concurrent.ImmediateEventExecutor;
 import io.netty.util.concurrent.Promise;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Random;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
 public class SocketStringEchoTest extends AbstractSocketTest {
@@ -55,30 +52,18 @@ public class SocketStringEchoTest extends AbstractSocketTest {
         }
     }
 
-    @Test
-    @Timeout(value = 60000, unit = TimeUnit.MILLISECONDS)
-    public void testStringEcho(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<ServerBootstrap, Bootstrap>() {
-            @Override
-            public void run(ServerBootstrap serverBootstrap, Bootstrap bootstrap) throws Throwable {
-                testStringEcho(serverBootstrap, bootstrap);
-            }
-        });
+    @Test(timeout = 60000)
+    public void testStringEcho() throws Throwable {
+        run();
     }
 
     public void testStringEcho(ServerBootstrap sb, Bootstrap cb) throws Throwable {
         testStringEcho(sb, cb, true);
     }
 
-    @Test
-    @Timeout(value = 60000, unit = TimeUnit.MILLISECONDS)
-    public void testStringEchoNotAutoRead(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<ServerBootstrap, Bootstrap>() {
-            @Override
-            public void run(ServerBootstrap serverBootstrap, Bootstrap bootstrap) throws Throwable {
-                testStringEchoNotAutoRead(serverBootstrap, bootstrap);
-            }
-        });
+    @Test(timeout = 60000)
+    public void testStringEchoNotAutoRead() throws Throwable {
+        run();
     }
 
     public void testStringEchoNotAutoRead(ServerBootstrap sb, Bootstrap cb) throws Throwable {

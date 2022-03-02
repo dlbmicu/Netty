@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -30,12 +30,10 @@ import io.netty.channel.nio.AbstractNioMessageChannel;
 import io.netty.channel.socket.DatagramChannelConfig;
 import io.netty.channel.socket.DatagramPacket;
 import io.netty.channel.socket.InternetProtocolFamily;
-import io.netty.util.UncheckedBooleanSupplier;
-import io.netty.util.internal.ObjectUtil;
 import io.netty.util.internal.SocketUtils;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
-import io.netty.util.internal.SuppressJava6Requirement;
+import io.netty.util.internal.UnstableApi;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -76,6 +74,7 @@ public final class NioDatagramChannel
     private final DatagramChannelConfig config;
 
     private Map<InetAddress, List<MembershipKey>> memberships;
+    private RecvByteBufAllocator.Handle allocHandle;
 
     private static DatagramChannel newSocket(SelectorProvider provider) {
         try {
@@ -91,7 +90,6 @@ public final class NioDatagramChannel
         }
     }
 
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     private static DatagramChannel newSocket(SelectorProvider provider, InternetProtocolFamily ipFamily) {
         if (ipFamily == null) {
             return newSocket(provider);
@@ -242,10 +240,11 @@ public final class NioDatagramChannel
     protected int doReadMessages(List<Object> buf) throws Exception {
         DatagramChannel ch = javaChannel();
         DatagramChannelConfig config = config();
-        RecvByteBufAllocator.Handle allocHandle = unsafe().recvBufAllocHandle();
-
+        RecvByteBufAllocator.Handle allocHandle = this.allocHandle;
+        if (allocHandle == null) {
+            this.allocHandle = allocHandle = config.getRecvByteBufAllocator().newHandle();
+        }
         ByteBuf data = allocHandle.allocate(config.getAllocator());
-        allocHandle.attemptedBytesRead(data.writableBytes());
         boolean free = true;
         try {
             ByteBuffer nioData = data.internalNioBuffer(data.writerIndex(), data.writableBytes());
@@ -255,9 +254,11 @@ public final class NioDatagramChannel
                 return 0;
             }
 
-            allocHandle.lastBytesRead(nioData.position() - pos);
-            buf.add(new DatagramPacket(data.writerIndex(data.writerIndex() + allocHandle.lastBytesRead()),
-                    localAddress(), remoteAddress));
+            int readBytes = nioData.position() - pos;
+            data.writerIndex(data.writerIndex() + readBytes);
+            allocHandle.record(readBytes);
+
+            buf.add(new DatagramPacket(data, localAddress(), remoteAddress));
             free = false;
             return 1;
         } catch (Throwable cause) {
@@ -369,12 +370,10 @@ public final class NioDatagramChannel
     @Override
     public ChannelFuture joinGroup(InetAddress multicastAddress, ChannelPromise promise) {
         try {
-            NetworkInterface iface = config.getNetworkInterface();
-            if (iface == null) {
-                iface = NetworkInterface.getByInetAddress(localAddress().getAddress());
-            }
             return joinGroup(
-                    multicastAddress, iface, null, promise);
+                    multicastAddress,
+                    NetworkInterface.getByInetAddress(localAddress().getAddress()),
+                    null, promise);
         } catch (SocketException e) {
             promise.setFailure(e);
         }
@@ -400,7 +399,6 @@ public final class NioDatagramChannel
         return joinGroup(multicastAddress, networkInterface, source, newPromise());
     }
 
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     public ChannelFuture joinGroup(
             InetAddress multicastAddress, NetworkInterface networkInterface,
@@ -408,8 +406,13 @@ public final class NioDatagramChannel
 
         checkJavaVersion();
 
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
+        if (multicastAddress == null) {
+            throw new NullPointerException("multicastAddress");
+        }
+
+        if (networkInterface == null) {
+            throw new NullPointerException("networkInterface");
+        }
 
         try {
             MembershipKey key;
@@ -476,15 +479,18 @@ public final class NioDatagramChannel
         return leaveGroup(multicastAddress, networkInterface, source, newPromise());
     }
 
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     public ChannelFuture leaveGroup(
             InetAddress multicastAddress, NetworkInterface networkInterface, InetAddress source,
             ChannelPromise promise) {
         checkJavaVersion();
 
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
+        if (multicastAddress == null) {
+            throw new NullPointerException("multicastAddress");
+        }
+        if (networkInterface == null) {
+            throw new NullPointerException("networkInterface");
+        }
 
         synchronized (this) {
             if (memberships != null) {
@@ -526,17 +532,22 @@ public final class NioDatagramChannel
     /**
      * Block the given sourceToBlock address for the given multicastAddress on the given networkInterface
      */
-    @SuppressJava6Requirement(reason = "Usage guarded by java version check")
     @Override
     public ChannelFuture block(
             InetAddress multicastAddress, NetworkInterface networkInterface,
             InetAddress sourceToBlock, ChannelPromise promise) {
         checkJavaVersion();
 
-        ObjectUtil.checkNotNull(multicastAddress, "multicastAddress");
-        ObjectUtil.checkNotNull(sourceToBlock, "sourceToBlock");
-        ObjectUtil.checkNotNull(networkInterface, "networkInterface");
+        if (multicastAddress == null) {
+            throw new NullPointerException("multicastAddress");
+        }
+        if (sourceToBlock == null) {
+            throw new NullPointerException("sourceToBlock");
+        }
 
+        if (networkInterface == null) {
+            throw new NullPointerException("networkInterface");
+        }
         synchronized (this) {
             if (memberships != null) {
                 List<MembershipKey> keys = memberships.get(multicastAddress);
@@ -583,13 +594,8 @@ public final class NioDatagramChannel
     }
 
     @Override
-    @Deprecated
     protected void setReadPending(boolean readPending) {
         super.setReadPending(readPending);
-    }
-
-    void clearReadPending0() {
-        clearReadPending();
     }
 
     @Override
@@ -600,16 +606,5 @@ public final class NioDatagramChannel
             return false;
         }
         return super.closeOnReadError(cause);
-    }
-
-    @Override
-    protected boolean continueReading(RecvByteBufAllocator.Handle allocHandle) {
-        if (allocHandle instanceof RecvByteBufAllocator.ExtendedHandle) {
-            // We use the TRUE_SUPPLIER as it is also ok to read less then what we did try to read (as long
-            // as we read anything).
-            return ((RecvByteBufAllocator.ExtendedHandle) allocHandle)
-                    .continueReading(UncheckedBooleanSupplier.TRUE_SUPPLIER);
-        }
-        return allocHandle.continueReading();
     }
 }

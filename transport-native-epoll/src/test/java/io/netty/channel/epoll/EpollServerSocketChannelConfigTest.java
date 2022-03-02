@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,26 +17,21 @@ package io.netty.channel.epoll;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelInboundHandlerAdapter;
-import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
-
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.AfterClass;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 import java.net.InetSocketAddress;
-import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class EpollServerSocketChannelConfigTest {
 
     private static EventLoopGroup group;
     private static EpollServerSocketChannel ch;
 
-    @BeforeAll
+    @BeforeClass
     public static void before() {
         group = new EpollEventLoopGroup(1);
         ServerBootstrap bootstrap = new ServerBootstrap();
@@ -46,7 +41,7 @@ public class EpollServerSocketChannelConfigTest {
                 .bind(new InetSocketAddress(0)).syncUninterruptibly().channel();
     }
 
-    @AfterAll
+    @AfterClass
     public static void after() {
         try {
             ch.close().syncUninterruptibly();
@@ -61,7 +56,7 @@ public class EpollServerSocketChannelConfigTest {
         assertEquals(0, ch.config().getTcpDeferAccept());
         ch.config().setTcpDeferAccept(10);
         // The returned value may be bigger then what we set.
-        // See https://www.spinics.net/lists/netdev/msg117330.html
+        // See http://www.spinics.net/lists/netdev/msg117330.html
         assertTrue(10 <= ch.config().getTcpDeferAccept());
     }
 
@@ -79,11 +74,5 @@ public class EpollServerSocketChannelConfigTest {
         assertFalse(ch.config().isFreeBind());
         ch.config().setFreeBind(true);
         assertTrue(ch.config().isFreeBind());
-    }
-
-    @Test
-    public void getGetOptions() {
-        Map<ChannelOption<?>, Object> map = ch.config().getOptions();
-        assertFalse(map.isEmpty());
     }
 }

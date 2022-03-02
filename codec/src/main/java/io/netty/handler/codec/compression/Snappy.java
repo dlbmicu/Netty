@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,6 +16,7 @@
 package io.netty.handler.codec.compression;
 
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
 
 /**
  * Uncompresses an input {@link ByteBuf} encoded with Snappy compression into an
@@ -23,7 +24,7 @@ import io.netty.buffer.ByteBuf;
  *
  * See <a href="https://github.com/google/snappy/blob/master/format_description.txt">snappy format</a>.
  */
-public final class Snappy {
+class Snappy {
 
     private static final int MAX_HT_SIZE = 1 << 14;
     private static final int MIN_COMPRESSIBLE_BYTES = 15;
@@ -38,11 +39,12 @@ public final class Snappy {
     private static final int COPY_2_BYTE_OFFSET = 2;
     private static final int COPY_4_BYTE_OFFSET = 3;
 
-    private State state = State.READING_PREAMBLE;
+    private State state = State.READY;
     private byte tag;
     private int written;
 
     private enum State {
+        READY,
         READING_PREAMBLE,
         READING_TAG,
         READING_LITERAL,
@@ -50,7 +52,7 @@ public final class Snappy {
     }
 
     public void reset() {
-        state = State.READING_PREAMBLE;
+        state = State.READY;
         tag = 0;
         written = 0;
     }
@@ -143,7 +145,7 @@ public final class Snappy {
      * @param in The input buffer to read 4 bytes from
      * @param index The index to read at
      * @param shift The shift value, for ensuring that the resulting value is
-     *     within the range of our hash table size
+     *     withing the range of our hash table size
      * @return A 32-bit hash of 4 bytes located at index
      */
     private static int hash(ByteBuf in, int index, int shift) {
@@ -269,6 +271,9 @@ public final class Snappy {
     public void decode(ByteBuf in, ByteBuf out) {
         while (in.isReadable()) {
             switch (state) {
+            case READY:
+                state = State.READING_PREAMBLE;
+                // fall through
             case READING_PREAMBLE:
                 int uncompressedLength = readPreamble(in);
                 if (uncompressedLength == PREAMBLE_NOT_FULL) {
@@ -277,6 +282,7 @@ public final class Snappy {
                 }
                 if (uncompressedLength == 0) {
                     // Should never happen, but it does mean we have nothing further to do
+                    state = State.READY;
                     return;
                 }
                 out.ensureWritable(uncompressedLength);
@@ -374,27 +380,6 @@ public final class Snappy {
     }
 
     /**
-     * Get the length varint (a series of bytes, where the lower 7 bits
-     * are data and the upper bit is a flag to indicate more bytes to be
-     * read).
-     *
-     * @param in The input buffer to get the preamble from
-     * @return The calculated length based on the input buffer, or 0 if
-     *   no preamble is able to be calculated
-     */
-    int getPreamble(ByteBuf in) {
-        if (state == State.READING_PREAMBLE) {
-            int readerIndex = in.readerIndex();
-            try {
-                return readPreamble(in);
-            } finally {
-                in.readerIndex(readerIndex);
-            }
-        }
-        return 0;
-    }
-
-    /**
      * Reads a literal from the input buffer directly to the output buffer.
      * A "literal" is an uncompressed segment of data stored directly in the
      * byte stream.
@@ -419,19 +404,19 @@ public final class Snappy {
             if (in.readableBytes() < 2) {
                 return NOT_ENOUGH_INPUT;
             }
-            length = in.readUnsignedShortLE();
+            length = ByteBufUtil.swapShort(in.readShort());
             break;
         case 62:
             if (in.readableBytes() < 3) {
                 return NOT_ENOUGH_INPUT;
             }
-            length = in.readUnsignedMediumLE();
+            length = ByteBufUtil.swapMedium(in.readUnsignedMedium());
             break;
         case 63:
             if (in.readableBytes() < 4) {
                 return NOT_ENOUGH_INPUT;
             }
-            length = in.readIntLE();
+            length = ByteBufUtil.swapInt(in.readInt());
             break;
         default:
             length = tag >> 2 & 0x3F;
@@ -511,7 +496,7 @@ public final class Snappy {
 
         int initialIndex = out.writerIndex();
         int length = 1 + (tag >> 2 & 0x03f);
-        int offset = in.readUnsignedShortLE();
+        int offset = ByteBufUtil.swapShort(in.readShort());
 
         validateOffset(offset, writtenSoFar);
 
@@ -555,7 +540,7 @@ public final class Snappy {
 
         int initialIndex = out.writerIndex();
         int length = 1 + (tag >> 2 & 0x03F);
-        int offset = in.readIntLE();
+        int offset = ByteBufUtil.swapInt(in.readInt());
 
         validateOffset(offset, writtenSoFar);
 
@@ -581,7 +566,7 @@ public final class Snappy {
 
     /**
      * Validates that the offset extracted from a compressed reference is within
-     * the permissible bounds of an offset (0 < offset < Integer.MAX_VALUE), and does not
+     * the permissible bounds of an offset (4 <= offset <= 32768), and does not
      * exceed the length of the chunk currently read so far.
      *
      * @param offset The offset extracted from the compressed reference
@@ -589,13 +574,12 @@ public final class Snappy {
      * @throws DecompressionException if the offset is invalid
      */
     private static void validateOffset(int offset, int chunkSizeSoFar) {
-        if (offset == 0) {
-            throw new DecompressionException("Offset is less than minimum permissible value");
+        if (offset > Short.MAX_VALUE) {
+            throw new DecompressionException("Offset exceeds maximum permissible value");
         }
 
-        if (offset < 0) {
-            // Due to arithmetic overflow
-            throw new DecompressionException("Offset is greater than maximum value supported by this implementation");
+        if (offset <= 0) {
+            throw new DecompressionException("Offset is less than minimum permissible value");
         }
 
         if (offset > chunkSizeSoFar) {
@@ -609,7 +593,7 @@ public final class Snappy {
      *
      * @param data The input data to calculate the CRC32C checksum of
      */
-    static int calculateChecksum(ByteBuf data) {
+    public static int calculateChecksum(ByteBuf data) {
         return calculateChecksum(data, data.readerIndex(), data.readableBytes());
     }
 
@@ -619,11 +603,18 @@ public final class Snappy {
      *
      * @param data The input data to calculate the CRC32C checksum of
      */
-    static int calculateChecksum(ByteBuf data, int offset, int length) {
+    public static int calculateChecksum(ByteBuf data, int offset, int length) {
         Crc32c crc32 = new Crc32c();
         try {
-            crc32.update(data, offset, length);
-            return maskChecksum(crc32.getValue());
+            if (data.hasArray()) {
+                crc32.update(data.array(), data.arrayOffset() + offset, length);
+            } else {
+                byte[] array = new byte[length];
+                data.getBytes(offset, array);
+                crc32.update(array, 0, length);
+            }
+
+            return maskChecksum((int) crc32.getValue());
         } finally {
             crc32.reset();
         }
@@ -671,7 +662,7 @@ public final class Snappy {
      * @param checksum The actual checksum of the data
      * @return The masked checksum
      */
-    static int maskChecksum(long checksum) {
-        return (int) ((checksum >> 15 | checksum << 17) + 0xa282ead8);
+    static int maskChecksum(int checksum) {
+        return (checksum >> 15 | checksum << 17) + 0xa282ead8;
     }
 }

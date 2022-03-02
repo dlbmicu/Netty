@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,10 +15,8 @@
  */
 package io.netty.handler.codec.spdy;
 
-import static io.netty.util.internal.ObjectUtil.checkNonEmpty;
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
-
 import io.netty.buffer.ByteBuf;
+import io.netty.util.CharsetUtil;
 
 final class SpdyCodecUtil {
 
@@ -288,8 +286,14 @@ final class SpdyCodecUtil {
     /**
      * Validate a SPDY header name.
      */
-    static void validateHeaderName(CharSequence name) {
-        checkNonEmpty(name, "name");
+    static void validateHeaderName(String name) {
+        if (name == null) {
+            throw new NullPointerException("name");
+        }
+        if (name.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "name cannot be length zero");
+        }
         // Since name may only contain ascii characters, for valid names
         // name.length() returns the number of bytes when UTF-8 encoded.
         if (name.length() > SPDY_MAX_NV_LENGTH) {
@@ -315,8 +319,10 @@ final class SpdyCodecUtil {
     /**
      * Validate a SPDY header value. Does not validate max length.
      */
-    static void validateHeaderValue(CharSequence value) {
-        checkNotNull(value, "value");
+    static void validateHeaderValue(String value) {
+        if (value == null) {
+            throw new NullPointerException("value");
+        }
         for (int i = 0; i < value.length(); i ++) {
             char c = value.charAt(i);
             if (c == 0) {

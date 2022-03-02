@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,10 +15,7 @@
  */
 package io.netty.handler.codec.compression;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import org.junit.Test;
 
 public class ZlibCrossTest2 extends ZlibTest {
 
@@ -28,18 +25,13 @@ public class ZlibCrossTest2 extends ZlibTest {
     }
 
     @Override
-    protected ZlibDecoder createDecoder(ZlibWrapper wrapper, int maxAllocation) {
-        return new JdkZlibDecoder(wrapper, maxAllocation);
+    protected ZlibDecoder createDecoder(ZlibWrapper wrapper) {
+        return new JdkZlibDecoder(wrapper);
     }
 
-    @Test
+    @Test(expected = DecompressionException.class)
     @Override
     public void testZLIB_OR_NONE3() throws Exception {
-        assertThrows(DecompressionException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                ZlibCrossTest2.super.testZLIB_OR_NONE3();
-            }
-        });
+        super.testZLIB_OR_NONE3();
     }
 }

@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,35 +16,28 @@
 
 package io.netty.util.concurrent;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.*;
+
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.rules.ExpectedException;
 
 public class PromiseNotifierTest {
 
+    @Rule
+    public ExpectedException expectedException = ExpectedException.none();
+
     @Test
     public void testNullPromisesArray() {
-        assertThrows(NullPointerException.class, new Executable() {
-            @Override
-            public void execute() {
-                new PromiseNotifier<Void, Future<Void>>((Promise<Void>[]) null);
-            }
-        });
+        expectedException.expect(NullPointerException.class);
+        new PromiseNotifier<Void, Future<Void>>((Promise<Void>[]) null);
     }
 
     @SuppressWarnings("unchecked")
     @Test
     public void testNullPromiseInArray() {
-        assertThrows(IllegalArgumentException.class, new Executable() {
-            @Override
-            public void execute() {
-                new PromiseNotifier<Void, Future<Void>>((Promise<Void>) null);
-            }
-        });
+        expectedException.expect(IllegalArgumentException.class);
+        new PromiseNotifier<Void, Future<Void>>((Promise<Void>) null);
     }
 
     @Test
@@ -95,16 +88,4 @@ public class PromiseNotifierTest {
         verify(p2).tryFailure(t);
     }
 
-    @Test
-    public void testCancelPropagationWhenFusedFromFuture() {
-        Promise<Void> p1 = ImmediateEventExecutor.INSTANCE.newPromise();
-        Promise<Void> p2 = ImmediateEventExecutor.INSTANCE.newPromise();
-
-        Promise<Void> returned = PromiseNotifier.cascade(p1, p2);
-        assertSame(p1, returned);
-
-        assertTrue(returned.cancel(false));
-        assertTrue(returned.isCancelled());
-        assertTrue(p2.isCancelled());
-    }
 }

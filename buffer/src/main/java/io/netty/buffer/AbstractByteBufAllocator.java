@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,11 +16,8 @@
 
 package io.netty.buffer;
 
-import static io.netty.util.internal.ObjectUtil.checkPositiveOrZero;
-
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.ResourceLeakTracker;
-import io.netty.util.internal.MathUtil;
 import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.StringUtil;
 
@@ -52,8 +49,6 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
                 if (leak != null) {
                     buf = new AdvancedLeakAwareByteBuf(buf, leak);
                 }
-                break;
-            default:
                 break;
         }
         return buf;
@@ -128,7 +123,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf ioBuffer() {
-        if (PlatformDependent.hasUnsafe() || isDirectBufferPooled()) {
+        if (PlatformDependent.hasUnsafe()) {
             return directBuffer(DEFAULT_INITIAL_CAPACITY);
         }
         return heapBuffer(DEFAULT_INITIAL_CAPACITY);
@@ -136,7 +131,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf ioBuffer(int initialCapacity) {
-        if (PlatformDependent.hasUnsafe() || isDirectBufferPooled()) {
+        if (PlatformDependent.hasUnsafe()) {
             return directBuffer(initialCapacity);
         }
         return heapBuffer(initialCapacity);
@@ -144,7 +139,7 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
 
     @Override
     public ByteBuf ioBuffer(int initialCapacity, int maxCapacity) {
-        if (PlatformDependent.hasUnsafe() || isDirectBufferPooled()) {
+        if (PlatformDependent.hasUnsafe()) {
             return directBuffer(initialCapacity, maxCapacity);
         }
         return heapBuffer(initialCapacity, maxCapacity);
@@ -225,7 +220,9 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
     }
 
     private static void validate(int initialCapacity, int maxCapacity) {
-        checkPositiveOrZero(initialCapacity, "initialCapacity");
+        if (initialCapacity < 0) {
+            throw new IllegalArgumentException("initialCapacity: " + initialCapacity + " (expected: 0+)");
+        }
         if (initialCapacity > maxCapacity) {
             throw new IllegalArgumentException(String.format(
                     "initialCapacity: %d (expected: not greater than maxCapacity(%d)",
@@ -246,35 +243,5 @@ public abstract class AbstractByteBufAllocator implements ByteBufAllocator {
     @Override
     public String toString() {
         return StringUtil.simpleClassName(this) + "(directByDefault: " + directByDefault + ')';
-    }
-
-    @Override
-    public int calculateNewCapacity(int minNewCapacity, int maxCapacity) {
-        checkPositiveOrZero(minNewCapacity, "minNewCapacity");
-        if (minNewCapacity > maxCapacity) {
-            throw new IllegalArgumentException(String.format(
-                    "minNewCapacity: %d (expected: not greater than maxCapacity(%d)",
-                    minNewCapacity, maxCapacity));
-        }
-        final int threshold = CALCULATE_THRESHOLD; // 4 MiB page
-
-        if (minNewCapacity == threshold) {
-            return threshold;
-        }
-
-        // If over threshold, do not double but just increase by threshold.
-        if (minNewCapacity > threshold) {
-            int newCapacity = minNewCapacity / threshold * threshold;
-            if (newCapacity > maxCapacity - threshold) {
-                newCapacity = maxCapacity;
-            } else {
-                newCapacity += threshold;
-            }
-            return newCapacity;
-        }
-
-        // 64 <= newCapacity is a power of 2 <= threshold
-        final int newCapacity = MathUtil.findNextPositivePowerOfTwo(Math.max(minNewCapacity, 64));
-        return Math.min(newCapacity, maxCapacity);
     }
 }

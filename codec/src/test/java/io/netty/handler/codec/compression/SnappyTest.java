@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -18,20 +18,16 @@ package io.netty.handler.codec.compression;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.util.CharsetUtil;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.After;
+import org.junit.Test;
 
 import static io.netty.handler.codec.compression.Snappy.*;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import java.nio.CharBuffer;
+import static org.junit.Assert.*;
 
 public class SnappyTest {
     private final Snappy snappy = new Snappy();
 
-    @AfterEach
+    @After
     public void resetSnappy() {
         snappy.reset();
     }
@@ -50,7 +46,7 @@ public class SnappyTest {
         ByteBuf expected = Unpooled.wrappedBuffer(new byte[] {
             0x6e, 0x65, 0x74, 0x74, 0x79
         });
-        assertEquals(expected, out, "Literal was not decoded correctly");
+        assertEquals("Literal was not decoded correctly", expected, out);
 
         in.release();
         out.release();
@@ -73,74 +69,59 @@ public class SnappyTest {
         ByteBuf expected = Unpooled.wrappedBuffer(new byte[] {
             0x6e, 0x65, 0x74, 0x74, 0x79, 0x6e, 0x65, 0x74, 0x74, 0x79
         });
-        assertEquals(expected, out, "Copy was not decoded correctly");
+        assertEquals("Copy was not decoded correctly", expected, out);
 
         in.release();
         out.release();
         expected.release();
     }
 
-    @Test
-    public void testDecodeCopyWithTinyOffset() {
-        final ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
+    @Test(expected = DecompressionException.class)
+    public void testDecodeCopyWithTinyOffset() throws Exception {
+        ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
             0x0b, // preamble length
             0x04 << 2, // literal tag + length
             0x6e, 0x65, 0x74, 0x74, 0x79, // "netty"
             0x05 << 2 | 0x01, // copy with 1-byte offset + length
             0x00 // INVALID offset (< 1)
         });
-        final ByteBuf out = Unpooled.buffer(10);
+        ByteBuf out = Unpooled.buffer(10);
         try {
-            assertThrows(DecompressionException.class, new Executable() {
-                @Override
-                public void execute() {
-                    snappy.decode(in, out);
-                }
-            });
+            snappy.decode(in, out);
         } finally {
             in.release();
             out.release();
         }
     }
 
-    @Test
-    public void testDecodeCopyWithOffsetBeforeChunk() {
-        final ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
+    @Test(expected = DecompressionException.class)
+    public void testDecodeCopyWithOffsetBeforeChunk() throws Exception {
+        ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
             0x0a, // preamble length
             0x04 << 2, // literal tag + length
             0x6e, 0x65, 0x74, 0x74, 0x79, // "netty"
             0x05 << 2 | 0x01, // copy with 1-byte offset + length
             0x0b // INVALID offset (greater than chunk size)
         });
-        final ByteBuf out = Unpooled.buffer(10);
+        ByteBuf out = Unpooled.buffer(10);
         try {
-            assertThrows(DecompressionException.class, new Executable() {
-                @Override
-                public void execute() {
-                    snappy.decode(in, out);
-                }
-            });
+            snappy.decode(in, out);
         } finally {
             in.release();
             out.release();
         }
     }
 
-    @Test
-    public void testDecodeWithOverlyLongPreamble() {
-        final ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
+    @Test(expected = DecompressionException.class)
+    public void testDecodeWithOverlyLongPreamble() throws Exception {
+        ByteBuf in = Unpooled.wrappedBuffer(new byte[] {
             -0x80, -0x80, -0x80, -0x80, 0x7f, // preamble length
             0x04 << 2, // literal tag + length
             0x6e, 0x65, 0x74, 0x74, 0x79, // "netty"
         });
-        final ByteBuf out = Unpooled.buffer(10);
+        ByteBuf out = Unpooled.buffer(10);
         try {
-            assertThrows(DecompressionException.class, new Executable() {
-                @Override
-                public void execute() {
-                    snappy.decode(in, out);
-                }
-            });
+            snappy.decode(in, out);
         } finally {
             in.release();
             out.release();
@@ -160,7 +141,7 @@ public class SnappyTest {
             0x04 << 2, // literal tag + length
             0x6e, 0x65, 0x74, 0x74, 0x79 // "netty"
         });
-        assertEquals(expected, out, "Encoded literal was invalid");
+        assertEquals("Encoded literal was invalid", expected, out);
 
         in.release();
         out.release();
@@ -233,13 +214,12 @@ public class SnappyTest {
             0x11, 0x4c,
         });
 
-        assertEquals(expected, out, "Encoded result was incorrect");
+        assertEquals("Encoded result was incorrect", expected, out);
 
         // Decode
         ByteBuf outDecoded = Unpooled.buffer();
         snappy.decode(out, outDecoded);
-        assertEquals(CharBuffer.wrap(srcStr),
-            CharBuffer.wrap(outDecoded.getCharSequence(0, outDecoded.writerIndex(), CharsetUtil.US_ASCII)));
+        assertEquals(srcStr, outDecoded.toString(0, outDecoded.writerIndex(), CharsetUtil.US_ASCII));
 
         in.release();
         out.release();
@@ -251,19 +231,7 @@ public class SnappyTest {
         ByteBuf input = Unpooled.wrappedBuffer(new byte[] {
                 'n', 'e', 't', 't', 'y'
         });
-
-        assertEquals(maskChecksum(0xd6cb8b55L), calculateChecksum(input));
-        input.release();
-    }
-
-    @Test
-    public void testMaskChecksum() {
-        ByteBuf input = Unpooled.wrappedBuffer(new byte[] {
-                0x00, 0x00, 0x00, 0x0f, 0x00, 0x00, 0x00, 0x00,
-                0x5f, 0x68, 0x65, 0x61, 0x72, 0x74, 0x62, 0x65,
-                0x61, 0x74, 0x5f,
-        });
-        assertEquals(0x44a4301f, calculateChecksum(input));
+        assertEquals(maskChecksum(0xd6cb8b55), calculateChecksum(input));
         input.release();
     }
 
@@ -277,18 +245,13 @@ public class SnappyTest {
         input.release();
     }
 
-    @Test
+    @Test(expected = DecompressionException.class)
     public void testValidateChecksumFails() {
-        final ByteBuf input = Unpooled.wrappedBuffer(new byte[] {
+        ByteBuf input = Unpooled.wrappedBuffer(new byte[] {
                 'y', 't', 't', 'e', 'n'
         });
         try {
-            assertThrows(DecompressionException.class, new Executable() {
-                @Override
-                public void execute() {
-                    validateChecksum(maskChecksum(0xd6cb8b55), input);
-                }
-            });
+            validateChecksum(maskChecksum(0xd6cb8b55), input);
         } finally {
             input.release();
         }
@@ -312,48 +275,13 @@ public class SnappyTest {
                 encodeLiteral(in, encoded, len);
                 byte tag = encoded.readByte();
                 decodeLiteral(tag, encoded, decoded);
-                assertEquals(expected, decoded, "Encoded or decoded literal was incorrect");
+                assertEquals("Encoded or decoded literal was incorrect", expected, decoded);
             } finally {
                 in.release();
                 encoded.release();
                 decoded.release();
                 expected.release();
             }
-        }
-    }
-
-    @Test
-    public void testLarge2ByteLiteralLengthAndCopyOffset() {
-        ByteBuf compressed = Unpooled.buffer();
-        ByteBuf actualDecompressed = Unpooled.buffer();
-        ByteBuf expectedDecompressed = Unpooled.buffer().writeByte(0x01).writeZero(0x8000).writeByte(0x01);
-        try {
-            // Generate a Snappy-encoded buffer that can only be decompressed correctly if
-            // the decoder treats 2-byte literal lengths and 2-byte copy offsets as unsigned values.
-
-            // Write preamble, uncompressed content length (0x8002) encoded as varint.
-            compressed.writeByte(0x82).writeByte(0x80).writeByte(0x02);
-
-            // Write a literal consisting of 0x01 followed by 0x8000 zeroes.
-            // The total length of this literal is 0x8001, which gets encoded as 0x8000 (length - 1).
-            // This length was selected because the encoded form is one larger than the maximum value
-            // representable using a signed 16-bit integer, and we want to assert the decoder is reading
-            // the length as an unsigned value.
-            compressed.writeByte(61 << 2); // tag for LITERAL with a 2-byte length
-            compressed.writeShortLE(0x8000); // length - 1
-            compressed.writeByte(0x01).writeZero(0x8000); // literal content
-
-            // Similarly, for a 2-byte copy operation we want to ensure the offset is treated as unsigned.
-            // Copy the initial 0x01 which was written 0x8001 bytes back in the stream.
-            compressed.writeByte(0x02); // tag for COPY with 2-byte offset, length = 1
-            compressed.writeShortLE(0x8001); // offset
-
-            snappy.decode(compressed, actualDecompressed);
-            assertEquals(expectedDecompressed, actualDecompressed);
-        } finally {
-            compressed.release();
-            actualDecompressed.release();
-            expectedDecompressed.release();
         }
     }
 }

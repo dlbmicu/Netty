@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- * https://www.apache.org/licenses/LICENSE-2.0
+ * http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,9 +17,9 @@
 package io.netty.test.udt.nio;
 
 import io.netty.test.udt.util.UnitHelp;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.BeforeClass;
 
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.Assume.*;
 
 /**
  * Base for UDT tests.
@@ -29,7 +29,7 @@ public abstract class AbstractUdtTest {
     /**
      * UDT test assumptions.
      */
-    @BeforeAll
+    @BeforeClass
     public static void assumeConditions() {
         assumeTrue(UnitHelp.canLoadAndInitClass("com.barchart.udt.SocketUDT"));
     }

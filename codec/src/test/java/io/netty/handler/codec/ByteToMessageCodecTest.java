@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -20,48 +20,34 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandler;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class ByteToMessageCodecTest {
 
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testSharable() {
-        assertThrows(IllegalStateException.class, new Executable() {
-            @Override
-            public void execute() {
-                new InvalidByteToMessageCodec();
-            }
-        });
+        new InvalidByteToMessageCodec();
     }
 
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testSharable2() {
-        assertThrows(IllegalStateException.class, new Executable() {
-            @Override
-            public void execute() {
-                new InvalidByteToMessageCodec2();
-            }
-        });
+        new InvalidByteToMessageCodec2();
     }
 
     @Test
     public void testForwardPendingData() {
         ByteToMessageCodec<Integer> codec = new ByteToMessageCodec<Integer>() {
             @Override
-            protected void encode(ChannelHandlerContext ctx, Integer msg, ByteBuf out) {
+            protected void encode(ChannelHandlerContext ctx, Integer msg, ByteBuf out) throws Exception {
                 out.writeInt(msg);
             }
 
             @Override
-            protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) {
+            protected void decode(ChannelHandlerContext ctx, ByteBuf in, List<Object> out) throws Exception {
                 if (in.readableBytes() >= 4) {
                     out.add(in.readInt());
                 }
@@ -76,9 +62,9 @@ public class ByteToMessageCodecTest {
         assertTrue(ch.writeInbound(buffer));
         ch.pipeline().remove(codec);
         assertTrue(ch.finish());
-        assertEquals(1, (Integer) ch.readInbound());
+        assertEquals(1, ch.readInbound());
 
-        ByteBuf buf = ch.readInbound();
+        ByteBuf buf = (ByteBuf) ch.readInbound();
         assertEquals(Unpooled.wrappedBuffer(new byte[]{'0'}), buf);
         buf.release();
         assertNull(ch.readInbound());

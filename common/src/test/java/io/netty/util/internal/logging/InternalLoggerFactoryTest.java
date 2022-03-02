@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,15 +15,13 @@
  */
 package io.netty.util.internal.logging;
 
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNotSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNotSame;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.*;
 
 public class InternalLoggerFactoryTest {
@@ -31,7 +29,7 @@ public class InternalLoggerFactoryTest {
     private InternalLoggerFactory oldLoggerFactory;
     private InternalLogger mockLogger;
 
-    @BeforeEach
+    @Before
     public void init() {
         oldLoggerFactory = InternalLoggerFactory.getDefaultFactory();
 
@@ -41,20 +39,15 @@ public class InternalLoggerFactoryTest {
         InternalLoggerFactory.setDefaultFactory(mockFactory);
     }
 
-    @AfterEach
+    @After
     public void destroy() {
         reset(mockLogger);
         InternalLoggerFactory.setDefaultFactory(oldLoggerFactory);
     }
 
-    @Test
+    @Test(expected = NullPointerException.class)
     public void shouldNotAllowNullDefaultFactory() {
-        assertThrows(NullPointerException.class, new Executable() {
-            @Override
-            public void execute() {
-                InternalLoggerFactory.setDefaultFactory(null);
-            }
-        });
+        InternalLoggerFactory.setDefaultFactory(null);
     }
 
     @Test

@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,22 +16,19 @@
 
 package io.netty.handler.ssl;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assume.assumeFalse;
+import static org.junit.Assume.assumeTrue;
+
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.security.PrivateKey;
 
-import io.netty.buffer.UnpooledByteBufAllocator;
+import org.junit.Test;
 
 import io.netty.handler.ssl.util.SelfSignedCertificate;
 import io.netty.util.ReferenceCountUtil;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 public class PemEncodedTest {
 
@@ -46,7 +43,7 @@ public class PemEncodedTest {
     }
 
     private static void testPemEncoded(SslProvider provider) throws Exception {
-        OpenSsl.ensureAvailability();
+        assumeTrue(OpenSsl.isAvailable());
         assumeFalse(OpenSsl.useKeyManagerFactory());
         PemPrivateKey pemKey;
         PemX509Certificate pemCert;
@@ -70,31 +67,6 @@ public class PemEncodedTest {
             assertRelease(pemKey);
             assertRelease(pemCert);
         }
-    }
-
-    @Test
-    public void testEncodedReturnsNull() throws Exception {
-        assertThrows(IllegalArgumentException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                PemPrivateKey.toPEM(UnpooledByteBufAllocator.DEFAULT, true, new PrivateKey() {
-                    @Override
-                    public String getAlgorithm() {
-                        return null;
-                    }
-
-                    @Override
-                    public String getFormat() {
-                        return null;
-                    }
-
-                    @Override
-                    public byte[] getEncoded() {
-                        return null;
-                    }
-                });
-            }
-        });
     }
 
     private static void assertRelease(PemEncoded encoded) {

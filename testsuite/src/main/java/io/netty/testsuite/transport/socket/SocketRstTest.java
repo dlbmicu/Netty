@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -22,36 +22,27 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOption;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Test;
 
 import java.io.IOException;
 import java.util.Locale;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class SocketRstTest extends AbstractSocketTest {
     protected void assertRstOnCloseException(IOException cause, Channel clientChannel) {
         if (Locale.getDefault() == Locale.US || Locale.getDefault() == Locale.UK) {
-            assertTrue(cause.getMessage().contains("reset") || cause.getMessage().contains("closed"),
-                "actual message: " + cause.getMessage());
+            assertTrue("actual message: " + cause.getMessage(),
+                       cause.getMessage().contains("reset") || cause.getMessage().contains("closed"));
         }
     }
 
-    @Test
-    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
-    public void testSoLingerZeroCausesOnlyRstOnClose(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<ServerBootstrap, Bootstrap>() {
-            @Override
-            public void run(ServerBootstrap serverBootstrap, Bootstrap bootstrap) throws Throwable {
-                testSoLingerZeroCausesOnlyRstOnClose(serverBootstrap, bootstrap);
-            }
-        });
+    @Test(timeout = 3000)
+    public void testSoLingerZeroCausesOnlyRstOnClose() throws Throwable {
+        run();
     }
 
     public void testSoLingerZeroCausesOnlyRstOnClose(ServerBootstrap sb, Bootstrap cb) throws Throwable {
@@ -98,21 +89,14 @@ public class SocketRstTest extends AbstractSocketTest {
 
         // Verify the client received a RST.
         Throwable cause = throwableRef.get();
-        assertTrue(cause instanceof IOException,
-            "actual [type, message]: [" + cause.getClass() + ", " + cause.getMessage() + "]");
-
+        assertTrue("actual [type, message]: [" + cause.getClass() + ", " + cause.getMessage() + "]",
+                   cause instanceof IOException);
         assertRstOnCloseException((IOException) cause, cc);
     }
 
-    @Test
-    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
-    public void testNoRstIfSoLingerOnClose(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<ServerBootstrap, Bootstrap>() {
-            @Override
-            public void run(ServerBootstrap serverBootstrap, Bootstrap bootstrap) throws Throwable {
-                testNoRstIfSoLingerOnClose(serverBootstrap, bootstrap);
-            }
-        });
+    @Test(timeout = 3000)
+    public void testNoRstIfSoLingerOnClose() throws Throwable {
+        run();
     }
 
     public void testNoRstIfSoLingerOnClose(ServerBootstrap sb, Bootstrap cb) throws Throwable {

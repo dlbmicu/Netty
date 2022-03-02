@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,7 +17,7 @@ package io.netty.handler.ssl;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -27,9 +27,8 @@ import java.nio.ByteOrder;
 import java.security.NoSuchAlgorithmException;
 
 import static io.netty.handler.ssl.SslUtils.getEncryptedPacketLength;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 
 public class SslUtilsTest {
 
@@ -63,51 +62,5 @@ public class SslUtilsTest {
         engine.setUseClientMode(true);
         engine.beginHandshake();
         return engine;
-    }
-
-    @Test
-    public void testIsTLSv13Cipher() {
-        assertTrue(SslUtils.isTLSv13Cipher("TLS_AES_128_GCM_SHA256"));
-        assertTrue(SslUtils.isTLSv13Cipher("TLS_AES_256_GCM_SHA384"));
-        assertTrue(SslUtils.isTLSv13Cipher("TLS_CHACHA20_POLY1305_SHA256"));
-        assertTrue(SslUtils.isTLSv13Cipher("TLS_AES_128_CCM_SHA256"));
-        assertTrue(SslUtils.isTLSv13Cipher("TLS_AES_128_CCM_8_SHA256"));
-        assertFalse(SslUtils.isTLSv13Cipher("TLS_DHE_RSA_WITH_AES_128_GCM_SHA256"));
-    }
-
-    @Test
-    public void shouldGetPacketLengthOfGmsslProtocolFromByteBuf() {
-        int bodyLength = 65;
-        ByteBuf buf = Unpooled.buffer()
-                              .writeByte(SslUtils.SSL_CONTENT_TYPE_HANDSHAKE)
-                              .writeShort(SslUtils.GMSSL_PROTOCOL_VERSION)
-                              .writeShort(bodyLength);
-
-        int packetLength = getEncryptedPacketLength(buf, 0);
-        assertEquals(bodyLength + SslUtils.SSL_RECORD_HEADER_LENGTH, packetLength);
-        buf.release();
-    }
-
-    @Test
-    public void shouldGetPacketLengthOfGmsslProtocolFromByteBuffer() {
-        int bodyLength = 65;
-        ByteBuf buf = Unpooled.buffer()
-                              .writeByte(SslUtils.SSL_CONTENT_TYPE_HANDSHAKE)
-                              .writeShort(SslUtils.GMSSL_PROTOCOL_VERSION)
-                              .writeShort(bodyLength);
-
-        int packetLength = getEncryptedPacketLength(new ByteBuffer[] { buf.nioBuffer() }, 0);
-        assertEquals(bodyLength + SslUtils.SSL_RECORD_HEADER_LENGTH, packetLength);
-        buf.release();
-    }
-
-    @Test
-    public void testValidHostNameForSni() {
-        assertFalse(SslUtils.isValidHostNameForSNI("/test.de"), "SNI domain can't start with /");
-        assertFalse(SslUtils.isValidHostNameForSNI("test.de."), "SNI domain can't end with a dot/");
-        assertTrue(SslUtils.isValidHostNameForSNI("test.de"));
-        // see https://datatracker.ietf.org/doc/html/rfc6066#section-3
-        // it has to be test.local to qualify as SNI
-        assertFalse(SslUtils.isValidHostNameForSNI("test"), "SNI has to be FQDN");
     }
 }

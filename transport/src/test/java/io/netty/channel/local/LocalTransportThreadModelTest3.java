@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -23,17 +23,16 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutorGroup;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Test;
 
 import java.util.Deque;
 import java.util.LinkedList;
@@ -41,10 +40,6 @@ import java.util.Queue;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.TimeUnit;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class LocalTransportThreadModelTest3 {
 
@@ -64,10 +59,10 @@ public class LocalTransportThreadModelTest3 {
     private static EventLoopGroup group;
     private static LocalAddress localAddr;
 
-    @BeforeAll
+    @BeforeClass
     public static void init() {
         // Configure a test server
-        group = new DefaultEventLoopGroup();
+        group = new LocalEventLoopGroup();
         ServerBootstrap sb = new ServerBootstrap();
         sb.group(group)
                 .channel(LocalServerChannel.class)
@@ -87,45 +82,41 @@ public class LocalTransportThreadModelTest3 {
         localAddr = (LocalAddress) sb.bind(LocalAddress.ANY).syncUninterruptibly().channel().localAddress();
     }
 
-    @AfterAll
+    @AfterClass
     public static void destroy() throws Exception {
         group.shutdownGracefully().sync();
     }
 
-    @Test
-    @Timeout(value = 60000, unit = TimeUnit.MILLISECONDS)
-    @Disabled("regression test")
+    @Test(timeout = 60000)
+    @Ignore("regression test")
     public void testConcurrentAddRemoveInboundEventsMultiple() throws Throwable {
         for (int i = 0; i < 50; i ++) {
             testConcurrentAddRemoveInboundEvents();
         }
     }
 
-    @Test
-    @Timeout(value = 60000, unit = TimeUnit.MILLISECONDS)
-    @Disabled("regression test")
+    @Test(timeout = 60000)
+    @Ignore("regression test")
     public void testConcurrentAddRemoveOutboundEventsMultiple() throws Throwable {
         for (int i = 0; i < 50; i ++) {
             testConcurrentAddRemoveOutboundEvents();
         }
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    @Disabled("needs a fix")
+    @Test(timeout = 30000)
+    @Ignore("needs a fix")
     public void testConcurrentAddRemoveInboundEvents() throws Throwable {
         testConcurrentAddRemove(true);
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    @Disabled("needs a fix")
+    @Test(timeout = 30000)
+    @Ignore("needs a fix")
     public void testConcurrentAddRemoveOutboundEvents() throws Throwable {
         testConcurrentAddRemove(false);
     }
 
     private static void testConcurrentAddRemove(boolean inbound) throws Exception {
-        EventLoopGroup l = new DefaultEventLoopGroup(4, new DefaultThreadFactory("l"));
+        EventLoopGroup l = new LocalEventLoopGroup(4, new DefaultThreadFactory("l"));
         EventExecutorGroup e1 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e1"));
         EventExecutorGroup e2 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e2"));
         EventExecutorGroup e3 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e3"));
@@ -219,10 +210,10 @@ public class LocalTransportThreadModelTest3 {
             for (;;) {
                 EventType event = events.poll();
                 if (event == null) {
-                    assertTrue(expectedEvents.isEmpty(), "Missing events:" + expectedEvents);
+                    Assert.assertTrue("Missing events:" + expectedEvents.toString(), expectedEvents.isEmpty());
                     break;
                 }
-                assertEquals(event, expectedEvents.poll());
+                Assert.assertEquals(event, expectedEvents.poll());
             }
         } finally {
             l.shutdownGracefully();
@@ -267,7 +258,7 @@ public class LocalTransportThreadModelTest3 {
         private final Queue<EventType> events;
         private final boolean inbound;
 
-        EventRecorder(Queue<EventType> events, boolean inbound) {
+        public EventRecorder(Queue<EventType> events, boolean inbound) {
             this.events = events;
             this.inbound = inbound;
         }

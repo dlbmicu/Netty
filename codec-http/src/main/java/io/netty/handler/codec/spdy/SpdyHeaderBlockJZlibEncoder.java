@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -23,7 +23,6 @@ import io.netty.buffer.Unpooled;
 import io.netty.handler.codec.compression.CompressionException;
 
 import static io.netty.handler.codec.spdy.SpdyCodecUtil.*;
-import static io.netty.util.internal.ObjectUtil.checkNotNullWithIAE;
 
 class SpdyHeaderBlockJZlibEncoder extends SpdyHeaderBlockRawEncoder {
 
@@ -123,8 +122,9 @@ class SpdyHeaderBlockJZlibEncoder extends SpdyHeaderBlockRawEncoder {
 
     @Override
     public ByteBuf encode(ByteBufAllocator alloc, SpdyHeadersFrame frame) throws Exception {
-        checkNotNullWithIAE(alloc, "alloc");
-        checkNotNullWithIAE(frame, "frame");
+        if (frame == null) {
+            throw new IllegalArgumentException("frame");
+        }
 
         if (finished) {
             return Unpooled.EMPTY_BUFFER;

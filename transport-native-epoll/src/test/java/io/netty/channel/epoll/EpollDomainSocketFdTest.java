@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -26,24 +26,19 @@ import io.netty.channel.unix.DomainSocketReadMode;
 import io.netty.channel.unix.FileDescriptor;
 import io.netty.testsuite.transport.TestsuitePermutation;
 import io.netty.testsuite.transport.socket.AbstractSocketTest;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.net.SocketAddress;
 import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class EpollDomainSocketFdTest extends AbstractSocketTest {
     @Override
     protected SocketAddress newSocketAddress() {
-        return EpollSocketTestPermutation.newDomainSocketAddress();
+        return EpollSocketTestPermutation.newSocketAddress();
     }
 
     @Override
@@ -51,15 +46,9 @@ public class EpollDomainSocketFdTest extends AbstractSocketTest {
         return EpollSocketTestPermutation.INSTANCE.domainSocket();
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testSendRecvFd(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<ServerBootstrap, Bootstrap>() {
-            @Override
-            public void run(ServerBootstrap serverBootstrap, Bootstrap bootstrap) throws Throwable {
-                testSendRecvFd(serverBootstrap, bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testSendRecvFd() throws Throwable {
+        run();
     }
 
     public void testSendRecvFd(ServerBootstrap sb, Bootstrap cb) throws Throwable {
@@ -105,10 +94,10 @@ public class EpollDomainSocketFdTest extends AbstractSocketTest {
 
         if (received instanceof FileDescriptor) {
             FileDescriptor fd = (FileDescriptor) received;
-            assertTrue(fd.isOpen());
+            Assert.assertTrue(fd.isOpen());
             fd.close();
-            assertFalse(fd.isOpen());
-            assertNull(queue.poll());
+            Assert.assertFalse(fd.isOpen());
+            Assert.assertNull(queue.poll());
         } else {
             throw (Throwable) received;
         }

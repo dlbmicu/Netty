@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -24,9 +24,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelOutboundHandlerAdapter;
 import io.netty.channel.ChannelPromise;
-import io.netty.util.concurrent.Future;
-import io.netty.util.internal.ObjectUtil;
 
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -94,7 +93,9 @@ public class WriteTimeoutHandler extends ChannelOutboundHandlerAdapter {
      *        the {@link TimeUnit} of {@code timeout}
      */
     public WriteTimeoutHandler(long timeout, TimeUnit unit) {
-        ObjectUtil.checkNotNull(unit, "unit");
+        if (unit == null) {
+            throw new NullPointerException("unit");
+        }
 
         if (timeout <= 0) {
             timeoutNanos = 0;
@@ -105,20 +106,15 @@ public class WriteTimeoutHandler extends ChannelOutboundHandlerAdapter {
 
     @Override
     public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-        if (timeoutNanos > 0) {
-            promise = promise.unvoid();
-            scheduleTimeout(ctx, promise);
-        }
+        scheduleTimeout(ctx, promise);
         ctx.write(msg, promise);
     }
 
     @Override
     public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
-        assert ctx.executor().inEventLoop();
         WriteTimeoutTask task = lastTask;
         lastTask = null;
         while (task != null) {
-            assert task.ctx.executor().inEventLoop();
             task.scheduledFuture.cancel(false);
             WriteTimeoutTask prev = task.prev;
             task.prev = null;
@@ -141,16 +137,16 @@ public class WriteTimeoutHandler extends ChannelOutboundHandlerAdapter {
     }
 
     private void addWriteTimeoutTask(WriteTimeoutTask task) {
-        assert task.ctx.executor().inEventLoop();
-        if (lastTask != null) {
+        if (lastTask == null) {
+            lastTask = task;
+        } else {
             lastTask.next = task;
             task.prev = lastTask;
+            lastTask = task;
         }
-        lastTask = task;
     }
 
     private void removeWriteTimeoutTask(WriteTimeoutTask task) {
-        assert task.ctx.executor().inEventLoop();
         if (task == lastTask) {
             // task is the tail of list
             assert task.next == null;
@@ -192,7 +188,7 @@ public class WriteTimeoutHandler extends ChannelOutboundHandlerAdapter {
         WriteTimeoutTask prev;
         WriteTimeoutTask next;
 
-        Future<?> scheduledFuture;
+        ScheduledFuture<?> scheduledFuture;
 
         WriteTimeoutTask(ChannelHandlerContext ctx, ChannelPromise promise) {
             this.ctx = ctx;
@@ -218,19 +214,7 @@ public class WriteTimeoutHandler extends ChannelOutboundHandlerAdapter {
         public void operationComplete(ChannelFuture future) throws Exception {
             // scheduledFuture has already be set when reaching here
             scheduledFuture.cancel(false);
-
-            // Check if its safe to modify the "doubly-linked-list" that we maintain. If its not we will schedule the
-            // modification so its picked up by the executor..
-            if (ctx.executor().inEventLoop()) {
-                removeWriteTimeoutTask(this);
-            } else {
-                // So let's just pass outself to the executor which will then take care of remove this task
-                // from the doubly-linked list. Schedule ourself is fine as the promise itself is done.
-                //
-                // This fixes https://github.com/netty/netty/issues/11053
-                assert promise.isDone();
-                ctx.executor().execute(this);
-            }
+            removeWriteTimeoutTask(this);
         }
     }
 }

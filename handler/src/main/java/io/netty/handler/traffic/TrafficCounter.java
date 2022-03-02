@@ -1,12 +1,9 @@
 /*
  * Copyright 2012 The Netty Project
- *
  * The Netty Project licenses this file to you under the Apache License,
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
- *
- * https://www.apache.org/licenses/LICENSE-2.0
- *
+ * http://www.apache.org/licenses/LICENSE-2.0
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
  * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
@@ -15,8 +12,6 @@
  */
 package io.netty.handler.traffic;
 
-import static io.netty.util.internal.ObjectUtil.checkNotNull;
-import static io.netty.util.internal.ObjectUtil.checkNotNullWithIAE;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
 
@@ -24,7 +19,6 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
-
 
 /**
  * Counts the number of read and written bytes for rate-limiting traffic.
@@ -129,8 +123,7 @@ public class TrafficCounter {
     /**
      * Delay between two captures
      */
-    final AtomicLong checkInterval = new AtomicLong(
-            AbstractTrafficShapingHandler.DEFAULT_CHECK_INTERVAL);
+    final AtomicLong checkInterval = new AtomicLong(AbstractTrafficShapingHandler.DEFAULT_CHECK_INTERVAL);
 
     // default 1 s
 
@@ -176,6 +169,7 @@ public class TrafficCounter {
             if (trafficShapingHandler != null) {
                 trafficShapingHandler.doAccounting(TrafficCounter.this);
             }
+            scheduledFuture = executor.schedule(this, checkInterval.get(), TimeUnit.MILLISECONDS);
         }
     }
 
@@ -193,7 +187,7 @@ public class TrafficCounter {
             monitorActive = true;
             monitor = new TrafficMonitoringTask();
             scheduledFuture =
-                executor.scheduleAtFixedRate(monitor, 0, localCheckInterval, TimeUnit.MILLISECONDS);
+                executor.schedule(monitor, localCheckInterval, TimeUnit.MILLISECONDS);
         }
     }
 
@@ -252,10 +246,13 @@ public class TrafficCounter {
      *            the checkInterval in millisecond between two computations.
      */
     public TrafficCounter(ScheduledExecutorService executor, String name, long checkInterval) {
+        if (name == null) {
+            throw new NullPointerException("name");
+        }
 
-        this.name = checkNotNull(name, "name");
         trafficShapingHandler = null;
         this.executor = executor;
+        this.name = name;
 
         init(checkInterval);
     }
@@ -277,9 +274,17 @@ public class TrafficCounter {
     public TrafficCounter(
             AbstractTrafficShapingHandler trafficShapingHandler, ScheduledExecutorService executor,
             String name, long checkInterval) {
-        this.name = checkNotNull(name, "name");
-        this.trafficShapingHandler = checkNotNullWithIAE(trafficShapingHandler, "trafficShapingHandler");
+
+        if (trafficShapingHandler == null) {
+            throw new IllegalArgumentException("trafficShapingHandler");
+        }
+        if (name == null) {
+            throw new NullPointerException("name");
+        }
+
+        this.trafficShapingHandler = trafficShapingHandler;
         this.executor = executor;
+        this.name = name;
 
         init(checkInterval);
     }
@@ -307,8 +312,7 @@ public class TrafficCounter {
                 // No more active monitoring
                 lastTime.set(milliSecondFromNano());
             } else {
-                // Restart
-                stop();
+                // Start if necessary
                 start();
             }
         }
@@ -419,7 +423,7 @@ public class TrafficCounter {
 
     /**
      * @return the lastCumulativeTime in millisecond as of System.currentTimeMillis()
-     * when the cumulative counters were reset to 0.
+     *         when the cumulative counters were reset to 0.
      */
     public long lastCumulativeTime() {
         return lastCumulativeTime;

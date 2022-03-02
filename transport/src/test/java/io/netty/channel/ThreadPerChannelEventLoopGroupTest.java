@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -25,16 +25,13 @@ import io.netty.util.concurrent.EventExecutor;
 import io.netty.util.concurrent.GlobalEventExecutor;
 import io.netty.util.concurrent.Promise;
 import io.netty.util.concurrent.SingleThreadEventExecutor;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.lang.reflect.Field;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
-@Disabled("Flaky test; See: https://github.com/netty/netty/issues/11551")
 public class ThreadPerChannelEventLoopGroupTest {
 
     private static final ChannelHandler NOOP_HANDLER = new ChannelHandlerAdapter() {
@@ -85,7 +82,7 @@ public class ThreadPerChannelEventLoopGroupTest {
         ChannelGroup channelGroup = new DefaultChannelGroup(testExecutor);
         while (taskCount-- > 0) {
             Channel channel = new EmbeddedChannel(NOOP_HANDLER);
-            loopGroup.register(new DefaultChannelPromise(channel, testExecutor));
+            loopGroup.register(channel, new DefaultChannelPromise(channel, testExecutor));
             channelGroup.add(channel);
         }
         channelGroup.close().sync();

@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,6 +15,7 @@
  */
 package io.netty.microbench.util;
 
+import static org.junit.Assert.assertNull;
 import io.netty.util.ResourceLeakDetector;
 import io.netty.util.internal.SystemPropertyUtil;
 
@@ -22,7 +23,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import org.openjdk.jmh.annotations.Measurement;
 import org.openjdk.jmh.annotations.Scope;
 import org.openjdk.jmh.annotations.State;
@@ -31,8 +32,6 @@ import org.openjdk.jmh.results.format.ResultFormatType;
 import org.openjdk.jmh.runner.Runner;
 import org.openjdk.jmh.runner.options.ChainedOptionsBuilder;
 import org.openjdk.jmh.runner.options.OptionsBuilder;
-
-import static org.junit.jupiter.api.Assertions.assertNull;
 
 /**
  * Base class for all JMH benchmarks.
@@ -44,8 +43,9 @@ public abstract class AbstractMicrobenchmarkBase {
     protected static final int DEFAULT_WARMUP_ITERATIONS = 10;
     protected static final int DEFAULT_MEASURE_ITERATIONS = 10;
     protected static final String[] BASE_JVM_ARGS = {
-        "-server", "-dsa", "-da", "-ea:io.netty...",
-        "-XX:+HeapDumpOnOutOfMemoryError", "-Dio.netty.leakDetection.level=disabled"};
+            "-server", "-dsa", "-da", "-ea:io.netty...", "-XX:+AggressiveOpts", "-XX:+UseBiasedLocking",
+            "-XX:+UseFastAccessorMethods", "-XX:+OptimizeStringConcat",
+            "-XX:+HeapDumpOnOutOfMemoryError", "-Dio.netty.noResourceLeakDetection"};
 
     static {
         ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.DISABLED);
@@ -55,8 +55,8 @@ public abstract class AbstractMicrobenchmarkBase {
         String className = getClass().getSimpleName();
 
         ChainedOptionsBuilder runnerOptions = new OptionsBuilder()
-            .include(".*" + className + ".*")
-            .jvmArgs(jvmArgs());
+                .include(".*" + className + ".*")
+                .jvmArgs(jvmArgs());
 
         if (getWarmupIterations() > 0) {
             runnerOptions.warmupIterations(getWarmupIterations());
@@ -93,7 +93,8 @@ public abstract class AbstractMicrobenchmarkBase {
             }
         }
         if (jvmArgs.length != customArgs.size()) {
-            jvmArgs = customArgs.toArray(new String[0]);
+            jvmArgs = new String[customArgs.size()];
+            customArgs.toArray(jvmArgs);
         }
         return jvmArgs;
     }

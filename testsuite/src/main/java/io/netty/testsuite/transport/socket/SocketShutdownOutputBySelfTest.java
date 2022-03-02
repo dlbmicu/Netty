@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -23,13 +23,9 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.SimpleChannelInboundHandler;
-import io.netty.channel.WriteBufferWaterMark;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.oio.OioSocketChannel;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Test;
 
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -41,34 +37,23 @@ import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.Assert.*;
+import static org.junit.Assume.assumeFalse;
 
 public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testShutdownOutput(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testShutdownOutput(bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testShutdownOutput() throws Throwable {
+        run();
     }
 
     public void testShutdownOutput(Bootstrap cb) throws Throwable {
         TestHandler h = new TestHandler();
         ServerSocket ss = new ServerSocket();
         Socket s = null;
-        SocketChannel ch = null;
         try {
             ss.bind(newSocketAddress());
-            ch = (SocketChannel) cb.handler(h).connect(ss.getLocalSocketAddress()).sync().channel();
+            SocketChannel ch = (SocketChannel) cb.handler(h).connect(ss.getLocalSocketAddress()).sync().channel();
             assertTrue(ch.isActive());
             assertFalse(ch.isOutputShutdown());
 
@@ -91,28 +76,19 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
             assertTrue(h.ch.isOutputShutdown());
 
             // If half-closed, the peer should be able to write something.
-            s.getOutputStream().write(new byte[] { 1 });
+            s.getOutputStream().write(1);
             assertEquals(1, (int) h.queue.take());
         } finally {
             if (s != null) {
                 s.close();
             }
-            if (ch != null) {
-                ch.close();
-            }
             ss.close();
         }
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testShutdownOutputAfterClosed(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testShutdownOutputAfterClosed(bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testShutdownOutputAfterClosed() throws Throwable {
+        run();
     }
 
     public void testShutdownOutputAfterClosed(Bootstrap cb) throws Throwable {
@@ -127,12 +103,6 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
 
             ch.close().syncUninterruptibly();
             try {
-                ch.shutdownInput().syncUninterruptibly();
-                fail();
-            } catch (Throwable cause) {
-                checkThrowable(cause);
-            }
-            try {
                 ch.shutdownOutput().syncUninterruptibly();
                 fail();
             } catch (Throwable cause) {
@@ -146,16 +116,9 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
         }
     }
 
-    @Disabled
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testWriteAfterShutdownOutputNoWritabilityChange(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testWriteAfterShutdownOutputNoWritabilityChange(bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testWriteAfterShutdownOutputNoWritabilityChange() throws Throwable {
+        run();
     }
 
     public void testWriteAfterShutdownOutputNoWritabilityChange(Bootstrap cb) throws Throwable {
@@ -165,7 +128,8 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
         SocketChannel ch = null;
         try {
             ss.bind(newSocketAddress());
-            cb.option(ChannelOption.WRITE_BUFFER_WATER_MARK, new WriteBufferWaterMark(2, 4));
+            cb.option(ChannelOption.WRITE_BUFFER_LOW_WATER_MARK, 2);
+            cb.option(ChannelOption.WRITE_BUFFER_HIGH_WATER_MARK, 4);
             ch = (SocketChannel) cb.handler(h).connect(ss.getLocalSocketAddress()).sync().channel();
             assumeFalse(ch instanceof OioSocketChannel);
             assertTrue(ch.isActive());
@@ -216,37 +180,12 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
         }
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testShutdownOutputSoLingerNoAssertError(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testShutdownOutputSoLingerNoAssertError(bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testShutdownOutputSoLingerNoAssertError() throws Throwable {
+        run();
     }
 
     public void testShutdownOutputSoLingerNoAssertError(Bootstrap cb) throws Throwable {
-        testShutdownSoLingerNoAssertError0(cb, true);
-    }
-
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testShutdownSoLingerNoAssertError(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testShutdownSoLingerNoAssertError(bootstrap);
-            }
-        });
-    }
-
-    public void testShutdownSoLingerNoAssertError(Bootstrap cb) throws Throwable {
-        testShutdownSoLingerNoAssertError0(cb, false);
-    }
-
-    private void testShutdownSoLingerNoAssertError0(Bootstrap cb, boolean output) throws Throwable {
         ServerSocket ss = new ServerSocket();
         Socket s = null;
 
@@ -259,11 +198,7 @@ public class SocketShutdownOutputBySelfTest extends AbstractClientSocketTest {
 
             cf.sync();
 
-            if (output) {
-                ((SocketChannel) cf.channel()).shutdownOutput().sync();
-            } else {
-                ((SocketChannel) cf.channel()).shutdown().sync();
-            }
+            ((SocketChannel) cf.channel()).shutdownOutput().sync();
         } finally {
             if (s != null) {
                 s.close();

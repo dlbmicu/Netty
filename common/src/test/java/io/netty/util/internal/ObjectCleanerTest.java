@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,26 +15,23 @@
  */
 package io.netty.util.internal;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Assert;
+import org.junit.Test;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
 
 public class ObjectCleanerTest {
 
     private Thread temporaryThread;
     private Object temporaryObject;
 
-    @Test
-    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 5000)
     public void testCleanup() throws Exception {
         final AtomicBoolean freeCalled = new AtomicBoolean();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -58,7 +55,7 @@ public class ObjectCleanerTest {
 
         latch.countDown();
         temporaryThread.join();
-        assertFalse(freeCalled.get());
+        Assert.assertFalse(freeCalled.get());
 
         // Null out the temporary object to ensure it is enqueued for GC.
         temporaryThread = null;
@@ -70,8 +67,7 @@ public class ObjectCleanerTest {
         }
     }
 
-    @Test
-    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 5000)
     public void testCleanupContinuesDespiteThrowing() throws InterruptedException {
         final AtomicInteger freeCalledCount = new AtomicInteger();
         final CountDownLatch latch = new CountDownLatch(1);
@@ -117,8 +113,7 @@ public class ObjectCleanerTest {
         }
     }
 
-    @Test
-    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 5000)
     public void testCleanerThreadIsDaemon() throws Exception {
         temporaryObject = new Object();
         ObjectCleaner.register(temporaryObject, new Runnable() {

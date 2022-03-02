@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -20,23 +20,13 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.socket.SocketChannel;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInfo;
-import org.junit.jupiter.api.Timeout;
-
-import java.util.concurrent.TimeUnit;
+import org.junit.Test;
 
 public class WriteBeforeRegisteredTest extends AbstractClientSocketTest {
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    public void testWriteBeforeConnect(TestInfo testInfo) throws Throwable {
-        run(testInfo, new Runner<Bootstrap>() {
-            @Override
-            public void run(Bootstrap bootstrap) throws Throwable {
-                testWriteBeforeConnect(bootstrap);
-            }
-        });
+    @Test(timeout = 30000)
+    public void testWriteBeforeConnect() throws Throwable {
+        run();
     }
 
     public void testWriteBeforeConnect(Bootstrap cb) throws Throwable {
@@ -53,6 +43,7 @@ public class WriteBeforeRegisteredTest extends AbstractClientSocketTest {
     }
 
     private static class TestHandler extends ChannelInboundHandlerAdapter {
+
         @Override
         public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause) throws Exception {
             cause.printStackTrace();

@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -13,21 +13,21 @@
  * License for the specific language governing permissions and limitations
  * under the License.
  */
+
 package io.netty.util;
 
 import io.netty.util.concurrent.FastThreadLocal;
-import io.netty.util.internal.ObjectPool;
-import io.netty.util.internal.PlatformDependent;
 import io.netty.util.internal.SystemPropertyUtil;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import org.jctools.queues.MessagePassingQueue;
 
-import java.util.ArrayDeque;
-import java.util.Queue;
-import java.util.concurrent.atomic.AtomicIntegerFieldUpdater;
+import java.lang.ref.WeakReference;
+import java.util.Arrays;
+import java.util.Map;
+import java.util.WeakHashMap;
+import java.util.concurrent.atomic.AtomicInteger;
 
-import static io.netty.util.internal.PlatformDependent.newMpscQueue;
+import static io.netty.util.internal.MathUtil.safeFindNextPositivePowerOfTwo;
 import static java.lang.Math.max;
 import static java.lang.Math.min;
 
@@ -37,373 +37,583 @@ import static java.lang.Math.min;
  * @param <T> the type of the pooled object
  */
 public abstract class Recycler<T> {
-    private static final InternalLogger logger = InternalLoggerFactory.getInstance(Recycler.class);
-    private static final Handle<?> NOOP_HANDLE = new Handle<Object>() {
-        @Override
-        public void recycle(Object object) {
-            // NOOP
-        }
 
-        @Override
-        public String toString() {
-            return "NOOP_HANDLE";
-        }
-    };
-    private static final int DEFAULT_INITIAL_MAX_CAPACITY_PER_THREAD = 4 * 1024; // Use 4k instances as default.
-    private static final int DEFAULT_MAX_CAPACITY_PER_THREAD;
+    private static final InternalLogger logger = InternalLoggerFactory.getInstance(Recycler.class);
+
+    private static final Handle NOOP_HANDLE = new Handle() { };
+    private static final AtomicInteger ID_GENERATOR = new AtomicInteger(Integer.MIN_VALUE);
+    private static final int OWN_THREAD_ID = ID_GENERATOR.getAndIncrement();
+    private static final int DEFAULT_INITIAL_MAX_CAPACITY = 32768; // Use 32k instances as default max capacity.
+
+    private static final int DEFAULT_MAX_CAPACITY;
+    private static final int INITIAL_CAPACITY;
+    private static final int MAX_SHARED_CAPACITY_FACTOR;
+    private static final int MAX_DELAYED_QUEUES_PER_THREAD;
+    private static final int LINK_CAPACITY;
     private static final int RATIO;
-    private static final int DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD;
-    private static final boolean BLOCKING_POOL;
 
     static {
         // In the future, we might have different maxCapacity for different object types.
         // e.g. io.netty.recycler.maxCapacity.writeTask
         //      io.netty.recycler.maxCapacity.outboundBuffer
-        int maxCapacityPerThread = SystemPropertyUtil.getInt("io.netty.recycler.maxCapacityPerThread",
-                SystemPropertyUtil.getInt("io.netty.recycler.maxCapacity", DEFAULT_INITIAL_MAX_CAPACITY_PER_THREAD));
-        if (maxCapacityPerThread < 0) {
-            maxCapacityPerThread = DEFAULT_INITIAL_MAX_CAPACITY_PER_THREAD;
+        int maxCapacity = SystemPropertyUtil.getInt("io.netty.recycler.maxCapacity.default",
+                                                    DEFAULT_INITIAL_MAX_CAPACITY);
+        if (maxCapacity < 0) {
+            maxCapacity = DEFAULT_INITIAL_MAX_CAPACITY;
         }
+        DEFAULT_MAX_CAPACITY = maxCapacity;
 
-        DEFAULT_MAX_CAPACITY_PER_THREAD = maxCapacityPerThread;
-        DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD = SystemPropertyUtil.getInt("io.netty.recycler.chunkSize", 32);
+        MAX_SHARED_CAPACITY_FACTOR = max(2,
+                SystemPropertyUtil.getInt("io.netty.recycler.maxSharedCapacityFactor",
+                        2));
+
+        MAX_DELAYED_QUEUES_PER_THREAD = max(0,
+                SystemPropertyUtil.getInt("io.netty.recycler.maxDelayedQueuesPerThread",
+                        // We use the same value as default EventLoop number
+                        NettyRuntime.availableProcessors() * 2));
+
+        LINK_CAPACITY = safeFindNextPositivePowerOfTwo(
+                max(SystemPropertyUtil.getInt("io.netty.recycler.linkCapacity", 16), 16));
 
         // By default we allow one push to a Recycler for each 8th try on handles that were never recycled before.
         // This should help to slowly increase the capacity of the recycler while not be too sensitive to allocation
         // bursts.
-        RATIO = max(0, SystemPropertyUtil.getInt("io.netty.recycler.ratio", 8));
-
-        BLOCKING_POOL = SystemPropertyUtil.getBoolean("io.netty.recycler.blocking", false);
+        RATIO = safeFindNextPositivePowerOfTwo(SystemPropertyUtil.getInt("io.netty.recycler.ratio", 8));
 
         if (logger.isDebugEnabled()) {
-            if (DEFAULT_MAX_CAPACITY_PER_THREAD == 0) {
-                logger.debug("-Dio.netty.recycler.maxCapacityPerThread: disabled");
+            if (DEFAULT_MAX_CAPACITY == 0) {
+                logger.debug("-Dio.netty.recycler.maxCapacity.default: disabled");
+                logger.debug("-Dio.netty.recycler.maxSharedCapacityFactor: disabled");
+                logger.debug("-Dio.netty.recycler.linkCapacity: disabled");
                 logger.debug("-Dio.netty.recycler.ratio: disabled");
-                logger.debug("-Dio.netty.recycler.chunkSize: disabled");
-                logger.debug("-Dio.netty.recycler.blocking: disabled");
             } else {
-                logger.debug("-Dio.netty.recycler.maxCapacityPerThread: {}", DEFAULT_MAX_CAPACITY_PER_THREAD);
+                logger.debug("-Dio.netty.recycler.maxCapacity.default: {}", DEFAULT_MAX_CAPACITY);
+                logger.debug("-Dio.netty.recycler.maxSharedCapacityFactor: {}", MAX_SHARED_CAPACITY_FACTOR);
+                logger.debug("-Dio.netty.recycler.linkCapacity: {}", LINK_CAPACITY);
                 logger.debug("-Dio.netty.recycler.ratio: {}", RATIO);
-                logger.debug("-Dio.netty.recycler.chunkSize: {}", DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD);
-                logger.debug("-Dio.netty.recycler.blocking: {}", BLOCKING_POOL);
             }
         }
+
+        INITIAL_CAPACITY = min(DEFAULT_MAX_CAPACITY, 256);
     }
 
-    private final int maxCapacityPerThread;
-    private final int interval;
-    private final int chunkSize;
-    private final FastThreadLocal<LocalPool<T>> threadLocal = new FastThreadLocal<LocalPool<T>>() {
+    private final int maxCapacity;
+    private final int maxSharedCapacityFactor;
+    private final int ratioMask;
+    private final int maxDelayedQueuesPerThread;
+
+    private final FastThreadLocal<Stack<T>> threadLocal = new FastThreadLocal<Stack<T>>() {
         @Override
-        protected LocalPool<T> initialValue() {
-            return new LocalPool<T>(maxCapacityPerThread, interval, chunkSize);
+        protected Stack<T> initialValue() {
+            return new Stack<T>(Recycler.this, Thread.currentThread(), maxCapacity, maxSharedCapacityFactor,
+                    ratioMask, maxDelayedQueuesPerThread);
         }
 
         @Override
-        protected void onRemoval(LocalPool<T> value) throws Exception {
-            super.onRemoval(value);
-            MessagePassingQueue<DefaultHandle<T>> handles = value.pooledHandles;
-            value.pooledHandles = null;
-            handles.clear();
+        protected void onRemoval(Stack<T> value) {
+            // Let us remove the WeakOrderQueue from the WeakHashMap directly if its safe to remove some overhead
+            if (value.threadRef.get() == Thread.currentThread()) {
+               if (DELAYED_RECYCLED.isSet()) {
+                   DELAYED_RECYCLED.get().remove(value);
+               }
+            }
         }
     };
 
     protected Recycler() {
-        this(DEFAULT_MAX_CAPACITY_PER_THREAD);
+        this(DEFAULT_MAX_CAPACITY);
     }
 
-    protected Recycler(int maxCapacityPerThread) {
-        this(maxCapacityPerThread, RATIO, DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD);
+    protected Recycler(int maxCapacity) {
+        this(maxCapacity, MAX_SHARED_CAPACITY_FACTOR);
     }
 
-    /**
-     * @deprecated Use one of the following instead:
-     * {@link #Recycler()}, {@link #Recycler(int)}, {@link #Recycler(int, int, int)}.
-     */
-    @Deprecated
-    @SuppressWarnings("unused") // Parameters we can't remove due to compatibility.
-    protected Recycler(int maxCapacityPerThread, int maxSharedCapacityFactor) {
-        this(maxCapacityPerThread, RATIO, DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD);
+    protected Recycler(int maxCapacity, int maxSharedCapacityFactor) {
+        this(maxCapacity, maxSharedCapacityFactor, RATIO, MAX_DELAYED_QUEUES_PER_THREAD);
     }
 
-    /**
-     * @deprecated Use one of the following instead:
-     * {@link #Recycler()}, {@link #Recycler(int)}, {@link #Recycler(int, int, int)}.
-     */
-    @Deprecated
-    @SuppressWarnings("unused") // Parameters we can't remove due to compatibility.
-    protected Recycler(int maxCapacityPerThread, int maxSharedCapacityFactor,
-                       int ratio, int maxDelayedQueuesPerThread) {
-        this(maxCapacityPerThread, ratio, DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD);
-    }
-
-    /**
-     * @deprecated Use one of the following instead:
-     * {@link #Recycler()}, {@link #Recycler(int)}, {@link #Recycler(int, int, int)}.
-     */
-    @Deprecated
-    @SuppressWarnings("unused") // Parameters we can't remove due to compatibility.
-    protected Recycler(int maxCapacityPerThread, int maxSharedCapacityFactor,
-                       int ratio, int maxDelayedQueuesPerThread, int delayedQueueRatio) {
-        this(maxCapacityPerThread, ratio, DEFAULT_QUEUE_CHUNK_SIZE_PER_THREAD);
-    }
-
-    protected Recycler(int maxCapacityPerThread, int ratio, int chunkSize) {
-        interval = max(0, ratio);
-        if (maxCapacityPerThread <= 0) {
-            this.maxCapacityPerThread = 0;
-            this.chunkSize = 0;
+    protected Recycler(int maxCapacity, int maxSharedCapacityFactor, int ratio, int maxDelayedQueuesPerThread) {
+        ratioMask = safeFindNextPositivePowerOfTwo(ratio) - 1;
+        if (maxCapacity <= 0) {
+            this.maxCapacity = 0;
+            this.maxSharedCapacityFactor = 1;
+            this.maxDelayedQueuesPerThread = 0;
         } else {
-            this.maxCapacityPerThread = max(4, maxCapacityPerThread);
-            this.chunkSize = max(2, min(chunkSize, this.maxCapacityPerThread >> 1));
+            this.maxCapacity = maxCapacity;
+            this.maxSharedCapacityFactor = max(1, maxSharedCapacityFactor);
+            this.maxDelayedQueuesPerThread = max(0, maxDelayedQueuesPerThread);
         }
     }
 
     @SuppressWarnings("unchecked")
     public final T get() {
-        if (maxCapacityPerThread == 0) {
-            return newObject((Handle<T>) NOOP_HANDLE);
+        if (maxCapacity == 0) {
+            return newObject(NOOP_HANDLE);
         }
-        LocalPool<T> localPool = threadLocal.get();
-        DefaultHandle<T> handle = localPool.claim();
-        T obj;
+        Stack<T> stack = threadLocal.get();
+        DefaultHandle handle = stack.pop();
         if (handle == null) {
-            handle = localPool.newHandle();
-            if (handle != null) {
-                obj = newObject(handle);
-                handle.set(obj);
-            } else {
-                obj = newObject((Handle<T>) NOOP_HANDLE);
-            }
-        } else {
-            obj = handle.get();
+            handle = stack.newHandle();
+            handle.value = newObject(handle);
         }
-
-        return obj;
+        return (T) handle.value;
     }
 
-    /**
-     * @deprecated use {@link Handle#recycle(Object)}.
-     */
-    @Deprecated
-    public final boolean recycle(T o, Handle<T> handle) {
+    public final boolean recycle(T o, Handle handle) {
         if (handle == NOOP_HANDLE) {
             return false;
         }
 
-        handle.recycle(o);
+        DefaultHandle h = (DefaultHandle) handle;
+        if (h.stack.parent != this) {
+            return false;
+        }
+        if (o != h.value) {
+            throw new IllegalArgumentException("o does not belong to handle");
+        }
+        h.recycle();
         return true;
     }
 
+    protected abstract T newObject(Handle handle);
+
+    final int threadLocalCapacity() {
+        return threadLocal.get().elements.length;
+    }
+
     final int threadLocalSize() {
-        return threadLocal.get().pooledHandles.size();
+        return threadLocal.get().size;
     }
 
-    protected abstract T newObject(Handle<T> handle);
+    public interface Handle { }
 
-    @SuppressWarnings("ClassNameSameAsAncestorName") // Can't change this due to compatibility.
-    public interface Handle<T> extends ObjectPool.Handle<T>  { }
+    static final class DefaultHandle implements Handle {
+        private int lastRecycledId;
+        private int recycleId;
 
-    private static final class DefaultHandle<T> implements Handle<T> {
-        private static final int STATE_CLAIMED = 0;
-        private static final int STATE_AVAILABLE = 1;
-        private static final AtomicIntegerFieldUpdater<DefaultHandle<?>> STATE_UPDATER;
-        static {
-            AtomicIntegerFieldUpdater<?> updater = AtomicIntegerFieldUpdater.newUpdater(DefaultHandle.class, "state");
-            //noinspection unchecked
-            STATE_UPDATER = (AtomicIntegerFieldUpdater<DefaultHandle<?>>) updater;
+        boolean hasBeenRecycled;
+
+        private Stack<?> stack;
+        private Object value;
+
+        DefaultHandle(Stack<?> stack) {
+            this.stack = stack;
         }
 
-        @SuppressWarnings({"FieldMayBeFinal", "unused"}) // Updated by STATE_UPDATER.
-        private volatile int state; // State is initialised to STATE_CLAIMED (aka. 0) so they can be released.
-        private final LocalPool<T> localPool;
-        private T value;
-
-        DefaultHandle(LocalPool<T> localPool) {
-            this.localPool = localPool;
+        public void recycle() {
+            stack.push(this);
         }
+    }
 
+    private static final FastThreadLocal<Map<Stack<?>, WeakOrderQueue>> DELAYED_RECYCLED =
+            new FastThreadLocal<Map<Stack<?>, WeakOrderQueue>>() {
         @Override
-        public void recycle(Object object) {
-            if (object != value) {
-                throw new IllegalArgumentException("object does not belong to handle");
+        protected Map<Stack<?>, WeakOrderQueue> initialValue() {
+            return new WeakHashMap<Stack<?>, WeakOrderQueue>();
+        }
+    };
+
+    // a queue that makes only moderate guarantees about visibility: items are seen in the correct order,
+    // but we aren't absolutely guaranteed to ever see anything at all, thereby keeping the queue cheap to maintain
+    private static final class WeakOrderQueue {
+
+        static final WeakOrderQueue DUMMY = new WeakOrderQueue();
+
+        // Let Link extend AtomicInteger for intrinsics. The Link itself will be used as writerIndex.
+        @SuppressWarnings("serial")
+        private static final class Link extends AtomicInteger {
+            private final DefaultHandle[] elements = new DefaultHandle[LINK_CAPACITY];
+
+            private int readIndex;
+            private Link next;
+        }
+
+        // chain of data items
+        private Link head, tail;
+        // pointer to another queue of delayed items for the same stack
+        private WeakOrderQueue next;
+        private final WeakReference<Thread> owner;
+        private final int id = ID_GENERATOR.getAndIncrement();
+        private final AtomicInteger availableSharedCapacity;
+
+        private WeakOrderQueue() {
+            owner = null;
+            availableSharedCapacity = null;
+        }
+
+        private WeakOrderQueue(Stack<?> stack, Thread thread) {
+            head = tail = new Link();
+            owner = new WeakReference<Thread>(thread);
+
+            // Its important that we not store the Stack itself in the WeakOrderQueue as the Stack also is used in
+            // the WeakHashMap as key. So just store the enclosed AtomicInteger which should allow to have the
+            // Stack itself GCed.
+            availableSharedCapacity = stack.availableSharedCapacity;
+        }
+
+        static WeakOrderQueue newQueue(Stack<?> stack, Thread thread) {
+            WeakOrderQueue queue = new WeakOrderQueue(stack, thread);
+            // Done outside of the constructor to ensure WeakOrderQueue.this does not escape the constructor and so
+            // may be accessed while its still constructed.
+            stack.setHead(queue);
+            return queue;
+        }
+
+        private void setNext(WeakOrderQueue next) {
+            assert next != this;
+            this.next = next;
+        }
+
+        /**
+         * Allocate a new {@link WeakOrderQueue} or return {@code null} if not possible.
+         */
+        static WeakOrderQueue allocate(Stack<?> stack, Thread thread) {
+            // We allocated a Link so reserve the space
+            return reserveSpace(stack.availableSharedCapacity, LINK_CAPACITY)
+                    ? newQueue(stack, thread) : null;
+        }
+
+        private static boolean reserveSpace(AtomicInteger availableSharedCapacity, int space) {
+            assert space >= 0;
+            for (;;) {
+                int available = availableSharedCapacity.get();
+                if (available < space) {
+                    return false;
+                }
+                if (availableSharedCapacity.compareAndSet(available, available - space)) {
+                    return true;
+                }
             }
-            localPool.release(this);
         }
 
-        T get() {
-            return value;
+        private void reclaimSpace(int space) {
+            assert space >= 0;
+            availableSharedCapacity.addAndGet(space);
         }
 
-        void set(T value) {
-            this.value = value;
+        void add(DefaultHandle handle) {
+            handle.lastRecycledId = id;
+
+            Link tail = this.tail;
+            int writeIndex;
+            if ((writeIndex = tail.get()) == LINK_CAPACITY) {
+                if (!reserveSpace(availableSharedCapacity, LINK_CAPACITY)) {
+                    // Drop it.
+                    return;
+                }
+                // We allocate a Link so reserve the space
+                this.tail = tail = tail.next = new Link();
+
+                writeIndex = tail.get();
+            }
+            tail.elements[writeIndex] = handle;
+            handle.stack = null;
+            // we lazy set to ensure that setting stack to null appears before we unnull it in the owning thread;
+            // this also means we guarantee visibility of an element in the queue if we see the index updated
+            tail.lazySet(writeIndex + 1);
         }
 
-        boolean availableToClaim() {
-            if (state != STATE_AVAILABLE) {
+        boolean hasFinalData() {
+            return tail.readIndex != tail.get();
+        }
+
+        // transfer as many items as we can from this queue to the stack, returning true if any were transferred
+        @SuppressWarnings("rawtypes")
+        boolean transfer(Stack<?> dst) {
+            Link head = this.head;
+            if (head == null) {
                 return false;
             }
-            return STATE_UPDATER.compareAndSet(this, STATE_AVAILABLE, STATE_CLAIMED);
-        }
 
-        void toAvailable() {
-            int prev = STATE_UPDATER.getAndSet(this, STATE_AVAILABLE);
-            if (prev == STATE_AVAILABLE) {
-                throw new IllegalStateException("Object has been recycled already.");
+            if (head.readIndex == LINK_CAPACITY) {
+                if (head.next == null) {
+                    return false;
+                }
+                this.head = head = head.next;
             }
-        }
-    }
 
-    private static final class LocalPool<T> {
-        private final int ratioInterval;
-        private volatile MessagePassingQueue<DefaultHandle<T>> pooledHandles;
-        private int ratioCounter;
+            final int srcStart = head.readIndex;
+            int srcEnd = head.get();
+            final int srcSize = srcEnd - srcStart;
+            if (srcSize == 0) {
+                return false;
+            }
 
-        @SuppressWarnings("unchecked")
-        LocalPool(int maxCapacity, int ratioInterval, int chunkSize) {
-            this.ratioInterval = ratioInterval;
-            if (BLOCKING_POOL) {
-                pooledHandles = new BlockingMessageQueue<DefaultHandle<T>>(maxCapacity);
+            final int dstSize = dst.size;
+            final int expectedCapacity = dstSize + srcSize;
+
+            if (expectedCapacity > dst.elements.length) {
+                final int actualCapacity = dst.increaseCapacity(expectedCapacity);
+                srcEnd = min(srcStart + actualCapacity - dstSize, srcEnd);
+            }
+
+            if (srcStart != srcEnd) {
+                final DefaultHandle[] srcElems = head.elements;
+                final DefaultHandle[] dstElems = dst.elements;
+                int newDstSize = dstSize;
+                for (int i = srcStart; i < srcEnd; i++) {
+                    DefaultHandle element = srcElems[i];
+                    if (element.recycleId == 0) {
+                        element.recycleId = element.lastRecycledId;
+                    } else if (element.recycleId != element.lastRecycledId) {
+                        throw new IllegalStateException("recycled already");
+                    }
+                    srcElems[i] = null;
+
+                    if (dst.dropHandle(element)) {
+                        // Drop the object.
+                        continue;
+                    }
+                    element.stack = dst;
+                    dstElems[newDstSize ++] = element;
+                }
+
+                if (srcEnd == LINK_CAPACITY && head.next != null) {
+                    // Add capacity back as the Link is GCed.
+                    reclaimSpace(LINK_CAPACITY);
+
+                    this.head = head.next;
+                }
+
+                head.readIndex = srcEnd;
+                if (dst.size == newDstSize) {
+                    return false;
+                }
+                dst.size = newDstSize;
+                return true;
             } else {
-                pooledHandles = (MessagePassingQueue<DefaultHandle<T>>) newMpscQueue(chunkSize, maxCapacity);
-            }
-            ratioCounter = ratioInterval; // Start at interval so the first one will be recycled.
-        }
-
-        DefaultHandle<T> claim() {
-            MessagePassingQueue<DefaultHandle<T>> handles = pooledHandles;
-            if (handles == null) {
-                return null;
-            }
-            DefaultHandle<T> handle;
-            do {
-                handle = handles.relaxedPoll();
-            } while (handle != null && !handle.availableToClaim());
-            return handle;
-        }
-
-        void release(DefaultHandle<T> handle) {
-            MessagePassingQueue<DefaultHandle<T>> handles = pooledHandles;
-            handle.toAvailable();
-            if (handles != null) {
-                handles.relaxedOffer(handle);
+                // The destination stack is full already.
+                return false;
             }
         }
 
-        DefaultHandle<T> newHandle() {
-            if (++ratioCounter >= ratioInterval) {
-                ratioCounter = 0;
-                return new DefaultHandle<T>(this);
+        @Override
+        protected void finalize() throws Throwable {
+            try {
+                super.finalize();
+            } finally {
+                // We need to reclaim all space that was reserved by this WeakOrderQueue so we not run out of space in
+                // the stack. This is needed as we not have a good life-time control over the queue as it is used in a
+                // WeakHashMap which will drop it at any time.
+                Link link = head;
+                while (link != null) {
+                    reclaimSpace(LINK_CAPACITY);
+                    link = link.next;
+                }
             }
-            return null;
         }
     }
 
-    /**
-     * This is an implementation of {@link MessagePassingQueue}, similar to what might be returned from
-     * {@link PlatformDependent#newMpscQueue(int)}, but intended to be used for debugging purpose.
-     * The implementation relies on synchronised monitor locks for thread-safety.
-     * The {@code drain} and {@code fill} bulk operations are not supported by this implementation.
-     */
-    private static final class BlockingMessageQueue<T> implements MessagePassingQueue<T> {
-        private final Queue<T> deque;
+    static final class Stack<T> {
+
+        // we keep a queue of per-thread queues, which is appended to once only, each time a new thread other
+        // than the stack owner recycles: when we run out of items in our stack we iterate this collection
+        // to scavenge those that can be reused. this permits us to incur minimal thread synchronisation whilst
+        // still recycling all items.
+        final Recycler<T> parent;
+
+        // We store the Thread in a WeakReference as otherwise we may be the only ones that still hold a strong
+        // Reference to the Thread itself after it died because DefaultHandle will hold a reference to the Stack.
+        //
+        // The biggest issue is if we do not use a WeakReference the Thread may not be able to be collected at all if
+        // the user will store a reference to the DefaultHandle somewhere and never clear this reference (or not clear
+        // it in a timely manner).
+        final WeakReference<Thread> threadRef;
+        final AtomicInteger availableSharedCapacity;
+        final int maxDelayedQueues;
         private final int maxCapacity;
+        private final int ratioMask;
+        private DefaultHandle[] elements;
+        private int size;
+        private int handleRecycleCount = -1; // Start with -1 so the first one will be recycled.
+        private WeakOrderQueue cursor, prev;
+        private volatile WeakOrderQueue head;
 
-        BlockingMessageQueue(int maxCapacity) {
+        Stack(Recycler<T> parent, Thread thread, int maxCapacity, int maxSharedCapacityFactor,
+              int ratioMask, int maxDelayedQueues) {
+            this.parent = parent;
+            threadRef = new WeakReference<Thread>(thread);
             this.maxCapacity = maxCapacity;
-            // This message passing queue is backed by an ArrayDeque instance,
-            // made thread-safe by synchronising on `this` BlockingMessageQueue instance.
-            // Why ArrayDeque?
-            // We use ArrayDeque instead of LinkedList or LinkedBlockingQueue because it's more space efficient.
-            // We use ArrayDeque instead of ArrayList because we need the queue APIs.
-            // We use ArrayDeque instead of ConcurrentLinkedQueue because CLQ is unbounded and has O(n) size().
-            // We use ArrayDeque instead of ArrayBlockingQueue because ABQ allocates its max capacity up-front,
-            // and these queues will usually have large capacities, in potentially great numbers (one per thread),
-            // but often only have comparatively few items in them.
-            deque = new ArrayDeque<T>();
+            availableSharedCapacity = new AtomicInteger(max(maxCapacity / maxSharedCapacityFactor, LINK_CAPACITY));
+            elements = new DefaultHandle[min(INITIAL_CAPACITY, maxCapacity)];
+            this.ratioMask = ratioMask;
+            this.maxDelayedQueues = maxDelayedQueues;
         }
 
-        @Override
-        public synchronized boolean offer(T e) {
-            if (deque.size() == maxCapacity) {
-                return false;
+        // Marked as synchronized to ensure this is serialized.
+        synchronized void setHead(WeakOrderQueue queue) {
+            queue.setNext(head);
+            head = queue;
+        }
+
+        int increaseCapacity(int expectedCapacity) {
+            int newCapacity = elements.length;
+            int maxCapacity = this.maxCapacity;
+            do {
+                newCapacity <<= 1;
+            } while (newCapacity < expectedCapacity && newCapacity < maxCapacity);
+
+            newCapacity = min(newCapacity, maxCapacity);
+            if (newCapacity != elements.length) {
+                elements = Arrays.copyOf(elements, newCapacity);
             }
-            return deque.offer(e);
+
+            return newCapacity;
         }
 
-        @Override
-        public synchronized T poll() {
-            return deque.poll();
+        DefaultHandle pop() {
+            int size = this.size;
+            if (size == 0) {
+                if (!scavenge()) {
+                    return null;
+                }
+                size = this.size;
+            }
+            size --;
+            DefaultHandle ret = elements[size];
+            elements[size] = null;
+            if (ret.lastRecycledId != ret.recycleId) {
+                throw new IllegalStateException("recycled multiple times");
+            }
+            ret.recycleId = 0;
+            ret.lastRecycledId = 0;
+            this.size = size;
+            return ret;
         }
 
-        @Override
-        public synchronized T peek() {
-            return deque.peek();
+        boolean scavenge() {
+            // continue an existing scavenge, if any
+            if (scavengeSome()) {
+                return true;
+            }
+
+            // reset our scavenge cursor
+            prev = null;
+            cursor = head;
+            return false;
         }
 
-        @Override
-        public synchronized int size() {
-            return deque.size();
+        boolean scavengeSome() {
+            WeakOrderQueue prev;
+            WeakOrderQueue cursor = this.cursor;
+            if (cursor == null) {
+                prev = null;
+                cursor = head;
+                if (cursor == null) {
+                    return false;
+                }
+            } else {
+                prev = this.prev;
+            }
+
+            boolean success = false;
+            do {
+                if (cursor.transfer(this)) {
+                    success = true;
+                    break;
+                }
+                WeakOrderQueue next = cursor.next;
+                if (cursor.owner.get() == null) {
+                    // If the thread associated with the queue is gone, unlink it, after
+                    // performing a volatile read to confirm there is no data left to collect.
+                    // We never unlink the first queue, as we don't want to synchronize on updating the head.
+                    if (cursor.hasFinalData()) {
+                        for (;;) {
+                            if (cursor.transfer(this)) {
+                                success = true;
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    if (prev != null) {
+                        prev.setNext(next);
+                    }
+                } else {
+                    prev = cursor;
+                }
+
+                cursor = next;
+
+            } while (cursor != null && !success);
+
+            this.prev = prev;
+            this.cursor = cursor;
+            return success;
         }
 
-        @Override
-        public synchronized void clear() {
-            deque.clear();
+        void push(DefaultHandle item) {
+            Thread currentThread = Thread.currentThread();
+            if (threadRef.get() == currentThread) {
+                // The current Thread is the thread that belongs to the Stack, we can try to push the object now.
+                pushNow(item);
+            } else {
+                // The current Thread is not the one that belongs to the Stack
+                // (or the Thread that belonged to the Stack was collected already), we need to signal that the push
+                // happens later.
+                pushLater(item, currentThread);
+            }
         }
 
-        @Override
-        public synchronized boolean isEmpty() {
-            return deque.isEmpty();
+        private void pushNow(DefaultHandle item) {
+            if ((item.recycleId | item.lastRecycledId) != 0) {
+                throw new IllegalStateException("recycled already");
+            }
+            item.recycleId = item.lastRecycledId = OWN_THREAD_ID;
+
+            int size = this.size;
+            if (size >= maxCapacity || dropHandle(item)) {
+                // Hit the maximum capacity or should drop - drop the possibly youngest object.
+                return;
+            }
+            if (size == elements.length) {
+                elements = Arrays.copyOf(elements, min(size << 1, maxCapacity));
+            }
+
+            elements[size] = item;
+            this.size = size + 1;
         }
 
-        @Override
-        public int capacity() {
-            return maxCapacity;
+        private void pushLater(DefaultHandle item, Thread thread) {
+            // we don't want to have a ref to the queue as the value in our weak map
+            // so we null it out; to ensure there are no races with restoring it later
+            // we impose a memory ordering here (no-op on x86)
+            Map<Stack<?>, WeakOrderQueue> delayedRecycled = DELAYED_RECYCLED.get();
+            WeakOrderQueue queue = delayedRecycled.get(this);
+            if (queue == null) {
+                if (delayedRecycled.size() >= maxDelayedQueues) {
+                    // Add a dummy queue so we know we should drop the object
+                    delayedRecycled.put(this, WeakOrderQueue.DUMMY);
+                    return;
+                }
+                // Check if we already reached the maximum number of delayed queues and if we can allocate at all.
+                if ((queue = WeakOrderQueue.allocate(this, thread)) == null) {
+                    // drop object
+                    return;
+                }
+                delayedRecycled.put(this, queue);
+            } else if (queue == WeakOrderQueue.DUMMY) {
+                // drop object
+                return;
+            }
+
+            queue.add(item);
         }
 
-        @Override
-        public boolean relaxedOffer(T e) {
-            return offer(e);
+        boolean dropHandle(DefaultHandle handle) {
+            if (!handle.hasBeenRecycled) {
+                if ((++handleRecycleCount & ratioMask) != 0) {
+                    // Drop the object.
+                    return true;
+                }
+                handle.hasBeenRecycled = true;
+            }
+            return false;
         }
 
-        @Override
-        public T relaxedPoll() {
-            return poll();
-        }
-
-        @Override
-        public T relaxedPeek() {
-            return peek();
-        }
-
-        @Override
-        public int drain(Consumer<T> c, int limit) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int fill(Supplier<T> s, int limit) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int drain(Consumer<T> c) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int fill(Supplier<T> s) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void drain(Consumer<T> c, WaitStrategy wait, ExitCondition exit) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void fill(Supplier<T> s, WaitStrategy wait, ExitCondition exit) {
-            throw new UnsupportedOperationException();
+        DefaultHandle newHandle() {
+            return new DefaultHandle(this);
         }
     }
 }

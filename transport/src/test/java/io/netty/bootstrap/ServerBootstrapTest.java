@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -21,31 +21,23 @@ import io.netty.channel.ChannelHandlerAdapter;
 import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
-import io.netty.channel.ChannelOption;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.local.LocalAddress;
 import io.netty.channel.local.LocalChannel;
 import io.netty.channel.local.LocalEventLoopGroup;
 import io.netty.channel.local.LocalServerChannel;
-import io.netty.util.AttributeKey;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.Test;
 
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 public class ServerBootstrapTest {
 
-    @Test
-    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 5000)
     public void testHandlerRegister() throws Exception {
         final CountDownLatch latch = new CountDownLatch(1);
         final AtomicReference<Throwable> error = new AtomicReference<Throwable>();
@@ -75,14 +67,12 @@ public class ServerBootstrapTest {
         }
     }
 
-    @Test
-    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 3000)
     public void testParentHandler() throws Exception {
         testParentHandler(false);
     }
 
-    @Test
-    @Timeout(value = 3000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 3000)
     public void testParentHandlerViaChannelInitializer() throws Exception {
         testParentHandler(true);
     }
@@ -106,7 +96,7 @@ public class ServerBootstrapTest {
             }
         };
 
-        EventLoopGroup group = new DefaultEventLoopGroup(1);
+        EventLoopGroup group = new LocalEventLoopGroup(1);
         Channel sch = null;
         Channel cch = null;
         try {
@@ -145,38 +135,5 @@ public class ServerBootstrapTest {
             }
             group.shutdownGracefully();
         }
-    }
-
-    @Test
-    public void optionsAndAttributesMustBeAvailableOnChildChannelInit() throws InterruptedException {
-        EventLoopGroup group = new DefaultEventLoopGroup(1);
-        LocalAddress addr = new LocalAddress(UUID.randomUUID().toString());
-        final AttributeKey<String> key = AttributeKey.valueOf(UUID.randomUUID().toString());
-        final AtomicBoolean requestServed = new AtomicBoolean();
-        ServerBootstrap sb = new ServerBootstrap()
-                .group(group)
-                .channel(LocalServerChannel.class)
-                .childOption(ChannelOption.CONNECT_TIMEOUT_MILLIS, 4242)
-                .childAttr(key, "value")
-                .childHandler(new ChannelInitializer<LocalChannel>() {
-                    @Override
-                    protected void initChannel(LocalChannel ch) throws Exception {
-                        Integer option = ch.config().getOption(ChannelOption.CONNECT_TIMEOUT_MILLIS);
-                        assertEquals(4242, (int) option);
-                        assertEquals("value", ch.attr(key).get());
-                        requestServed.set(true);
-                    }
-                });
-        Channel serverChannel = sb.bind(addr).syncUninterruptibly().channel();
-
-        Bootstrap cb = new Bootstrap();
-        cb.group(group)
-                .channel(LocalChannel.class)
-                .handler(new ChannelInboundHandlerAdapter());
-        Channel clientChannel = cb.connect(addr).syncUninterruptibly().channel();
-        serverChannel.close().syncUninterruptibly();
-        clientChannel.close().syncUninterruptibly();
-        group.shutdownGracefully();
-        assertTrue(requestServed.get());
     }
 }

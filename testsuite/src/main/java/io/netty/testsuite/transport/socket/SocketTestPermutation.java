@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,9 +17,9 @@ package io.netty.testsuite.transport.socket;
 
 import io.netty.bootstrap.AbstractBootstrap;
 import io.netty.bootstrap.Bootstrap;
+import io.netty.bootstrap.ChannelFactory;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFactory;
 import io.netty.channel.ChannelOption;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
@@ -70,7 +70,6 @@ public class SocketTestPermutation {
             new OioEventLoopGroup(Integer.MAX_VALUE, new DefaultThreadFactory("testsuite-oio-worker", true));
 
     protected <A extends AbstractBootstrap<?, ?>, B extends AbstractBootstrap<?, ?>>
-
     List<BootstrapComboFactory<A, B>> combo(List<BootstrapFactory<A>> sbfs, List<BootstrapFactory<B>> cbfs) {
 
         List<BootstrapComboFactory<A, B>> list = new ArrayList<BootstrapComboFactory<A, B>>();
@@ -113,23 +112,7 @@ public class SocketTestPermutation {
         return list;
     }
 
-    public List<BootstrapComboFactory<ServerBootstrap, Bootstrap>> socketWithFastOpen() {
-        // Make the list of ServerBootstrap factories.
-        List<BootstrapFactory<ServerBootstrap>> sbfs = serverSocket();
-
-        // Make the list of Bootstrap factories.
-        List<BootstrapFactory<Bootstrap>> cbfs = clientSocketWithFastOpen();
-
-        // Populate the combinations
-        List<BootstrapComboFactory<ServerBootstrap, Bootstrap>> list = combo(sbfs, cbfs);
-
-        // Remove the OIO-OIO case which often leads to a dead lock by its nature.
-        list.remove(list.size() - 1);
-
-        return list;
-    }
-
-    public List<BootstrapComboFactory<Bootstrap, Bootstrap>> datagram(final InternetProtocolFamily family) {
+    public List<BootstrapComboFactory<Bootstrap, Bootstrap>> datagram() {
         // Make the list of Bootstrap factories.
         List<BootstrapFactory<Bootstrap>> bfs = Arrays.asList(
                 new BootstrapFactory<Bootstrap>() {
@@ -138,7 +121,7 @@ public class SocketTestPermutation {
                         return new Bootstrap().group(nioWorkerGroup).channelFactory(new ChannelFactory<Channel>() {
                             @Override
                             public Channel newChannel() {
-                                return new NioDatagramChannel(family);
+                                return new NioDatagramChannel(InternetProtocolFamily.IPv4);
                             }
 
                             @Override
@@ -197,10 +180,6 @@ public class SocketTestPermutation {
                     }
                 }
         );
-    }
-
-    public List<BootstrapFactory<Bootstrap>> clientSocketWithFastOpen() {
-        return clientSocket();
     }
 
     public List<BootstrapFactory<Bootstrap>> datagramSocket() {

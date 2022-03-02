@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -15,9 +15,9 @@
  */
 package io.netty.util.internal;
 
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class ThreadLocalRandomTest {
 
@@ -25,11 +25,11 @@ public class ThreadLocalRandomTest {
     public void getInitialSeedUniquifierPreservesInterrupt() {
         try {
             Thread.currentThread().interrupt();
-            assertTrue(Thread.currentThread().isInterrupted(),
-                    "Assert that thread is interrupted before invocation of getInitialSeedUniquifier()");
+            assertTrue("Assert that thread is interrupted before invocation of getInitialSeedUniquifier()",
+                    Thread.currentThread().isInterrupted());
             ThreadLocalRandom.getInitialSeedUniquifier();
-            assertTrue(Thread.currentThread().isInterrupted(),
-                    "Assert that thread is interrupted after invocation of getInitialSeedUniquifier()");
+            assertTrue("Assert that thread is interrupted after invocation of getInitialSeedUniquifier()",
+                    Thread.currentThread().isInterrupted());
         } finally {
             Thread.interrupted(); // clear interrupted status in order to not affect other tests
         }

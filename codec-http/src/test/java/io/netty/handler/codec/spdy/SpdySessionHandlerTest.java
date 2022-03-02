@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -20,15 +20,12 @@ import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class SpdySessionHandlerTest {
 
@@ -84,9 +81,9 @@ public class SpdySessionHandlerTest {
         SpdyHeadersFrame spdyHeadersFrame = (SpdyHeadersFrame) msg;
         assertEquals(streamId, spdyHeadersFrame.streamId());
         assertEquals(last, spdyHeadersFrame.isLast());
-        for (CharSequence name: headers.names()) {
-            List<CharSequence> expectedValues = headers.getAll(name);
-            List<CharSequence> receivedValues = spdyHeadersFrame.headers().getAll(name);
+        for (String name: headers.names()) {
+            List<String> expectedValues = headers.getAll(name);
+            List<String> receivedValues = spdyHeadersFrame.headers().getAll(name);
             assertTrue(receivedValues.containsAll(expectedValues));
             receivedValues.removeAll(expectedValues);
             assertTrue(receivedValues.isEmpty());
@@ -108,7 +105,7 @@ public class SpdySessionHandlerTest {
 
         SpdySynStreamFrame spdySynStreamFrame =
                 new DefaultSpdySynStreamFrame(localStreamId, 0, (byte) 0);
-        spdySynStreamFrame.headers().set("compression", "test");
+        spdySynStreamFrame.headers().set("Compression", "test");
 
         SpdyDataFrame spdyDataFrame = new DefaultSpdyDataFrame(localStreamId);
         spdyDataFrame.setLast(true);
@@ -141,8 +138,8 @@ public class SpdySessionHandlerTest {
         assertNull(sessionHandler.readOutbound());
         SpdyHeadersFrame spdyHeadersFrame = new DefaultSpdyHeadersFrame(localStreamId);
 
-        spdyHeadersFrame.headers().add("header", "test1");
-        spdyHeadersFrame.headers().add("header", "test2");
+        spdyHeadersFrame.headers().add("HEADER", "test1");
+        spdyHeadersFrame.headers().add("HEADER", "test2");
 
         sessionHandler.writeInbound(spdyHeadersFrame);
         assertHeaders(sessionHandler.readOutbound(), localStreamId, false, spdyHeadersFrame.headers());
@@ -248,7 +245,7 @@ public class SpdySessionHandlerTest {
 
         SpdySynStreamFrame spdySynStreamFrame =
                 new DefaultSpdySynStreamFrame(localStreamId, 0, (byte) 0);
-        spdySynStreamFrame.headers().set("compression", "test");
+        spdySynStreamFrame.headers().set("Compression", "test");
 
         SpdyDataFrame spdyDataFrame = new DefaultSpdyDataFrame(localStreamId);
         spdyDataFrame.setLast(true);
@@ -360,7 +357,7 @@ public class SpdySessionHandlerTest {
                     int streamId = spdySynStreamFrame.streamId();
                     SpdySynReplyFrame spdySynReplyFrame = new DefaultSpdySynReplyFrame(streamId);
                     spdySynReplyFrame.setLast(spdySynStreamFrame.isLast());
-                    for (Map.Entry<CharSequence, CharSequence> entry: spdySynStreamFrame.headers()) {
+                    for (Map.Entry<String, String> entry: spdySynStreamFrame.headers()) {
                         spdySynReplyFrame.headers().add(entry.getKey(), entry.getValue());
                     }
 

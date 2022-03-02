@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,24 +16,37 @@
 package io.netty.handler.ssl;
 
 import java.security.Provider;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
 
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.condition.DisabledIf;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.runner.RunWith;
+import org.junit.runners.Parameterized;
 
-import javax.net.ssl.SSLSessionContext;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
 
+import static org.junit.Assume.assumeTrue;
 
-@DisabledIf("checkConscryptDisabled")
+@RunWith(Parameterized.class)
 public class ConscryptJdkSslEngineInteropTest extends SSLEngineTest {
 
-    public ConscryptJdkSslEngineInteropTest() {
-        super(false);
+    @Parameterized.Parameters(name = "{index}: bufferType = {0}")
+    public static Collection<Object> data() {
+        List<Object> params = new ArrayList<Object>();
+        for (BufferType type: BufferType.values()) {
+            params.add(type);
+        }
+        return params;
     }
 
-    static boolean checkConscryptDisabled() {
-        return !Conscrypt.isAvailable();
+    public ConscryptJdkSslEngineInteropTest(BufferType type) {
+        super(type);
+    }
+
+    @BeforeClass
+    public static void checkConscrypt() {
+        assumeTrue(Conscrypt.isAvailable());
     }
 
     @Override
@@ -51,40 +64,19 @@ public class ConscryptJdkSslEngineInteropTest extends SSLEngineTest {
         return Java8SslTestUtils.conscryptProvider();
     }
 
-    @MethodSource("newTestParams")
-    @ParameterizedTest
-    @Disabled /* Does the JDK support a "max certificate chain length"? */
+    @Ignore /* Does the JDK support a "max certificate chain length"? */
     @Override
-    public void testMutualAuthValidClientCertChainTooLongFailOptionalClientAuth(SSLEngineTestParam param)
-            throws Exception {
+    public void testMutualAuthValidClientCertChainTooLongFailOptionalClientAuth() throws Exception {
     }
 
-    @MethodSource("newTestParams")
-    @ParameterizedTest
-    @Disabled /* Does the JDK support a "max certificate chain length"? */
+    @Ignore /* Does the JDK support a "max certificate chain length"? */
     @Override
-    public void testMutualAuthValidClientCertChainTooLongFailRequireClientAuth(SSLEngineTestParam param)
-            throws Exception {
+    public void testMutualAuthValidClientCertChainTooLongFailRequireClientAuth() throws Exception {
     }
 
-    @MethodSource("newTestParams")
-    @ParameterizedTest
     @Override
     protected boolean mySetupMutualAuthServerIsValidServerException(Throwable cause) {
         // TODO(scott): work around for a JDK issue. The exception should be SSLHandshakeException.
         return super.mySetupMutualAuthServerIsValidServerException(cause) || causedBySSLException(cause);
-    }
-
-    @Override
-    protected void invalidateSessionsAndAssert(SSLSessionContext context) {
-        // Not supported by conscrypt
-    }
-
-    @MethodSource("newTestParams")
-    @ParameterizedTest
-    @Disabled("Disabled due a conscrypt bug")
-    @Override
-    public void testInvalidSNIIsIgnoredAndNotThrow(SSLEngineTestParam param) throws Exception {
-        super.testInvalidSNIIsIgnoredAndNotThrow(param);
     }
 }

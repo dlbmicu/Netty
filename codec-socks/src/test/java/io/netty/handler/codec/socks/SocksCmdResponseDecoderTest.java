@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -18,13 +18,9 @@ package io.netty.handler.codec.socks;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.internal.logging.InternalLogger;
 import io.netty.util.internal.logging.InternalLoggerFactory;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class SocksCmdResponseDecoderTest {
     private static final InternalLogger logger = InternalLoggerFactory.getInstance(SocksCmdResponseDecoderTest.class);
@@ -39,7 +35,7 @@ public class SocksCmdResponseDecoderTest {
         if (addressType == SocksAddressType.UNKNOWN) {
             assertTrue(embedder.readInbound() instanceof UnknownSocksResponse);
         } else {
-            msg = embedder.readInbound();
+            msg = (SocksResponse) embedder.readInbound();
             assertEquals(((SocksCmdResponse) msg).cmdStatus(), cmdStatus);
             if (host != null) {
                 assertEquals(((SocksCmdResponse) msg).host(), host);
@@ -64,15 +60,9 @@ public class SocksCmdResponseDecoderTest {
     /**
      * Verifies that invalid bound host will fail with IllegalArgumentException during encoding.
      */
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testInvalidAddress() {
-        assertThrows(IllegalArgumentException.class, new Executable() {
-            @Override
-            public void execute() {
-                testSocksCmdResponseDecoderWithDifferentParams(
-                        SocksCmdStatus.SUCCESS, SocksAddressType.IPv4, "1", 80);
-            }
-        });
+        testSocksCmdResponseDecoderWithDifferentParams(SocksCmdStatus.SUCCESS, SocksAddressType.IPv4, "1", 80);
     }
 
     /**

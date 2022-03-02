@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -17,6 +17,7 @@ package io.netty.channel.epoll;
 
 import io.netty.bootstrap.Bootstrap;
 import io.netty.bootstrap.ServerBootstrap;
+import io.netty.handler.ssl.SslContext;
 import io.netty.testsuite.transport.TestsuitePermutation;
 import io.netty.testsuite.transport.socket.SocketSslEchoTest;
 
@@ -24,9 +25,19 @@ import java.net.SocketAddress;
 import java.util.List;
 
 public class EpollDomainSocketSslEchoTest extends SocketSslEchoTest {
+    public EpollDomainSocketSslEchoTest(
+            SslContext serverCtx, SslContext clientCtx, Renegotiation renegotiation,
+            boolean serverUsesDelegatedTaskExecutor, boolean clientUsesDelegatedTaskExecutor,
+            boolean autoRead, boolean useChunkedWriteHandler, boolean useCompositeByteBuf) {
+
+        super(serverCtx, clientCtx, renegotiation,
+              serverUsesDelegatedTaskExecutor, clientUsesDelegatedTaskExecutor,
+              autoRead, useChunkedWriteHandler, useCompositeByteBuf);
+    }
+
     @Override
     protected SocketAddress newSocketAddress() {
-        return EpollSocketTestPermutation.newDomainSocketAddress();
+        return EpollSocketTestPermutation.newSocketAddress();
     }
 
     @Override

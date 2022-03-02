@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -18,12 +18,9 @@ package io.netty.handler.codec;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
-import org.junit.jupiter.api.Test;
+import org.junit.Assert;
+import org.junit.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assertions.fail;
 
 public class LengthFieldBasedFrameDecoderTest {
 
@@ -39,19 +36,19 @@ public class LengthFieldBasedFrameDecoderTest {
         EmbeddedChannel channel = new EmbeddedChannel(new LengthFieldBasedFrameDecoder(16, 0, 4));
         try {
             channel.writeInbound(buf);
-            fail();
+            Assert.fail();
         } catch (TooLongFrameException e) {
             // expected
         }
-        assertTrue(channel.finish());
+        Assert.assertTrue(channel.finish());
 
-        ByteBuf b = channel.readInbound();
-        assertEquals(5, b.readableBytes());
-        assertEquals(1, b.readInt());
-        assertEquals('a', b.readByte());
+        ByteBuf b = (ByteBuf) channel.readInbound();
+        Assert.assertEquals(5, b.readableBytes());
+        Assert.assertEquals(1, b.readInt());
+        Assert.assertEquals('a', b.readByte());
         b.release();
 
-        assertNull(channel.readInbound());
+        Assert.assertNull(channel.readInbound());
         channel.finish();
     }
 
@@ -66,22 +63,22 @@ public class LengthFieldBasedFrameDecoderTest {
         buf.writeByte('a');
         EmbeddedChannel channel = new EmbeddedChannel(new LengthFieldBasedFrameDecoder(16, 0, 4));
         try {
-            channel.writeInbound(buf.readRetainedSlice(14));
-            fail();
+            channel.writeInbound(buf.readSlice(14).retain());
+            Assert.fail();
         } catch (TooLongFrameException e) {
             // expected
         }
-        assertTrue(channel.writeInbound(buf.readRetainedSlice(buf.readableBytes())));
+        Assert.assertTrue(channel.writeInbound(buf.readSlice(buf.readableBytes()).retain()));
 
-        assertTrue(channel.finish());
+        Assert.assertTrue(channel.finish());
 
-        ByteBuf b = channel.readInbound();
-        assertEquals(5, b.readableBytes());
-        assertEquals(1, b.readInt());
-        assertEquals('a', b.readByte());
+        ByteBuf b = (ByteBuf) channel.readInbound();
+        Assert.assertEquals(5, b.readableBytes());
+        Assert.assertEquals(1, b.readInt());
+        Assert.assertEquals('a', b.readByte());
         b.release();
 
-        assertNull(channel.readInbound());
+        Assert.assertNull(channel.readInbound());
         channel.finish();
 
         buf.release();

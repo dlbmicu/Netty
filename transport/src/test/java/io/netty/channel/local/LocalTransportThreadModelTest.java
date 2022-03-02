@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -24,39 +24,32 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPromise;
-import io.netty.channel.DefaultEventLoopGroup;
 import io.netty.channel.EventLoopGroup;
 import io.netty.util.ReferenceCountUtil;
 import io.netty.util.concurrent.DefaultEventExecutorGroup;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.EventExecutorGroup;
-import org.junit.jupiter.api.AfterAll;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Disabled;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.Timeout;
+import org.junit.AfterClass;
+import org.junit.Assert;
+import org.junit.BeforeClass;
+import org.junit.Ignore;
+import org.junit.Test;
 
 import java.util.HashSet;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertTrue;
 
 public class LocalTransportThreadModelTest {
 
     private static EventLoopGroup group;
     private static LocalAddress localAddr;
 
-    @BeforeAll
+    @BeforeClass
     public static void init() {
         // Configure a test server
-        group = new DefaultEventLoopGroup();
+        group = new LocalEventLoopGroup();
         ServerBootstrap sb = new ServerBootstrap();
         sb.group(group)
           .channel(LocalServerChannel.class)
@@ -76,29 +69,27 @@ public class LocalTransportThreadModelTest {
         localAddr = (LocalAddress) sb.bind(LocalAddress.ANY).syncUninterruptibly().channel().localAddress();
     }
 
-    @AfterAll
+    @AfterClass
     public static void destroy() throws Exception {
         group.shutdownGracefully().sync();
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    @Disabled("regression test")
+    @Test(timeout = 30000)
+    @Ignore("regression test")
     public void testStagedExecutionMultiple() throws Throwable {
         for (int i = 0; i < 10; i ++) {
             testStagedExecution();
         }
     }
 
-    @Test
-    @Timeout(value = 5000, unit = TimeUnit.MILLISECONDS)
+    @Test(timeout = 5000)
     public void testStagedExecution() throws Throwable {
-        EventLoopGroup l = new DefaultEventLoopGroup(4, new DefaultThreadFactory("l"));
+        EventLoopGroup l = new LocalEventLoopGroup(4, new DefaultThreadFactory("l"));
         EventExecutorGroup e1 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e1"));
         EventExecutorGroup e2 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e2"));
         ThreadNameAuditor h1 = new ThreadNameAuditor();
         ThreadNameAuditor h2 = new ThreadNameAuditor();
-        ThreadNameAuditor h3 = new ThreadNameAuditor(true);
+        ThreadNameAuditor h3 = new ThreadNameAuditor();
 
         Channel ch = new LocalChannel();
         // With no EventExecutor specified, h1 will be always invoked by EventLoop 'l'.
@@ -143,43 +134,43 @@ public class LocalTransportThreadModelTest {
 
         try {
             // Events should never be handled from the current thread.
-            assertFalse(h1.inboundThreadNames.contains(currentName));
-            assertFalse(h2.inboundThreadNames.contains(currentName));
-            assertFalse(h3.inboundThreadNames.contains(currentName));
-            assertFalse(h1.outboundThreadNames.contains(currentName));
-            assertFalse(h2.outboundThreadNames.contains(currentName));
-            assertFalse(h3.outboundThreadNames.contains(currentName));
-            assertFalse(h1.removalThreadNames.contains(currentName));
-            assertFalse(h2.removalThreadNames.contains(currentName));
-            assertFalse(h3.removalThreadNames.contains(currentName));
+            Assert.assertFalse(h1.inboundThreadNames.contains(currentName));
+            Assert.assertFalse(h2.inboundThreadNames.contains(currentName));
+            Assert.assertFalse(h3.inboundThreadNames.contains(currentName));
+            Assert.assertFalse(h1.outboundThreadNames.contains(currentName));
+            Assert.assertFalse(h2.outboundThreadNames.contains(currentName));
+            Assert.assertFalse(h3.outboundThreadNames.contains(currentName));
+            Assert.assertFalse(h1.removalThreadNames.contains(currentName));
+            Assert.assertFalse(h2.removalThreadNames.contains(currentName));
+            Assert.assertFalse(h3.removalThreadNames.contains(currentName));
 
             // Assert that events were handled by the correct executor.
             for (String name: h1.inboundThreadNames) {
-                assertTrue(name.startsWith("l-"));
+                Assert.assertTrue(name.startsWith("l-"));
             }
             for (String name: h2.inboundThreadNames) {
-                assertTrue(name.startsWith("e1-"));
+                Assert.assertTrue(name.startsWith("e1-"));
             }
             for (String name: h3.inboundThreadNames) {
-                assertTrue(name.startsWith("e2-"));
+                Assert.assertTrue(name.startsWith("e2-"));
             }
             for (String name: h1.outboundThreadNames) {
-                assertTrue(name.startsWith("l-"));
+                Assert.assertTrue(name.startsWith("l-"));
             }
             for (String name: h2.outboundThreadNames) {
-                assertTrue(name.startsWith("e1-"));
+                Assert.assertTrue(name.startsWith("e1-"));
             }
             for (String name: h3.outboundThreadNames) {
-                assertTrue(name.startsWith("e2-"));
+                Assert.assertTrue(name.startsWith("e2-"));
             }
             for (String name: h1.removalThreadNames) {
-                assertTrue(name.startsWith("l-"));
+                Assert.assertTrue(name.startsWith("l-"));
             }
             for (String name: h2.removalThreadNames) {
-                assertTrue(name.startsWith("e1-"));
+                Assert.assertTrue(name.startsWith("e1-"));
             }
             for (String name: h3.removalThreadNames) {
-                assertTrue(name.startsWith("e2-"));
+                Assert.assertTrue(name.startsWith("e2-"));
             }
 
             // Assert that the events for the same handler were handled by the same thread.
@@ -187,30 +178,30 @@ public class LocalTransportThreadModelTest {
             names.addAll(h1.inboundThreadNames);
             names.addAll(h1.outboundThreadNames);
             names.addAll(h1.removalThreadNames);
-            assertEquals(1, names.size());
+            Assert.assertEquals(1, names.size());
 
             names.clear();
             names.addAll(h2.inboundThreadNames);
             names.addAll(h2.outboundThreadNames);
             names.addAll(h2.removalThreadNames);
-            assertEquals(1, names.size());
+            Assert.assertEquals(1, names.size());
 
             names.clear();
             names.addAll(h3.inboundThreadNames);
             names.addAll(h3.outboundThreadNames);
             names.addAll(h3.removalThreadNames);
-            assertEquals(1, names.size());
+            Assert.assertEquals(1, names.size());
 
             // Count the number of events
-            assertEquals(1, h1.inboundThreadNames.size());
-            assertEquals(2, h2.inboundThreadNames.size());
-            assertEquals(3, h3.inboundThreadNames.size());
-            assertEquals(3, h1.outboundThreadNames.size());
-            assertEquals(2, h2.outboundThreadNames.size());
-            assertEquals(1, h3.outboundThreadNames.size());
-            assertEquals(1, h1.removalThreadNames.size());
-            assertEquals(1, h2.removalThreadNames.size());
-            assertEquals(1, h3.removalThreadNames.size());
+            Assert.assertEquals(1, h1.inboundThreadNames.size());
+            Assert.assertEquals(2, h2.inboundThreadNames.size());
+            Assert.assertEquals(3, h3.inboundThreadNames.size());
+            Assert.assertEquals(3, h1.outboundThreadNames.size());
+            Assert.assertEquals(2, h2.outboundThreadNames.size());
+            Assert.assertEquals(1, h3.outboundThreadNames.size());
+            Assert.assertEquals(1, h1.removalThreadNames.size());
+            Assert.assertEquals(1, h2.removalThreadNames.size());
+            Assert.assertEquals(1, h3.removalThreadNames.size());
         } catch (AssertionError e) {
             System.out.println("H1I: " + h1.inboundThreadNames);
             System.out.println("H2I: " + h2.inboundThreadNames);
@@ -233,11 +224,10 @@ public class LocalTransportThreadModelTest {
         }
     }
 
-    @Test
-    @Timeout(value = 30000, unit = TimeUnit.MILLISECONDS)
-    @Disabled
+    @Test(timeout = 30000)
+    @Ignore
     public void testConcurrentMessageBufferAccess() throws Throwable {
-        EventLoopGroup l = new DefaultEventLoopGroup(4, new DefaultThreadFactory("l"));
+        EventLoopGroup l = new LocalEventLoopGroup(4, new DefaultThreadFactory("l"));
         EventExecutorGroup e1 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e1"));
         EventExecutorGroup e2 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e2"));
         EventExecutorGroup e3 = new DefaultEventExecutorGroup(4, new DefaultThreadFactory("e3"));
@@ -370,15 +360,6 @@ public class LocalTransportThreadModelTest {
         private final Queue<String> inboundThreadNames = new ConcurrentLinkedQueue<String>();
         private final Queue<String> outboundThreadNames = new ConcurrentLinkedQueue<String>();
         private final Queue<String> removalThreadNames = new ConcurrentLinkedQueue<String>();
-        private final boolean discard;
-
-        ThreadNameAuditor() {
-            this(false);
-        }
-
-        ThreadNameAuditor(boolean discard) {
-            this.discard = discard;
-        }
 
         @Override
         public void handlerRemoved(ChannelHandlerContext ctx) throws Exception {
@@ -388,9 +369,7 @@ public class LocalTransportThreadModelTest {
         @Override
         public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
             inboundThreadNames.add(Thread.currentThread().getName());
-            if (!discard) {
-                ctx.fireChannelRead(msg);
-            }
+            ctx.fireChannelRead(msg);
         }
 
         @Override
@@ -424,13 +403,13 @@ public class LocalTransportThreadModelTest {
             if (t == null) {
                 this.t = Thread.currentThread();
             } else {
-                assertSame(t, Thread.currentThread());
+                Assert.assertSame(t, Thread.currentThread());
             }
 
             ByteBuf out = ctx.alloc().buffer(4);
             int m = ((Integer) msg).intValue();
             int expected = inCnt ++;
-            assertEquals(expected, m);
+            Assert.assertEquals(expected, m);
             out.writeInt(m);
 
             ctx.fireChannelRead(out);
@@ -438,7 +417,7 @@ public class LocalTransportThreadModelTest {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            assertSame(t, Thread.currentThread());
+            Assert.assertSame(t, Thread.currentThread());
 
             // Don't let the write request go to the server-side channel - just swallow.
             boolean swallow = this == ctx.pipeline().first();
@@ -448,7 +427,7 @@ public class LocalTransportThreadModelTest {
             for (int j = 0; j < count; j ++) {
                 int actual = m.readInt();
                 int expected = outCnt ++;
-                assertEquals(expected, actual);
+                Assert.assertEquals(expected, actual);
                 if (!swallow) {
                     ctx.write(actual);
                 }
@@ -482,7 +461,7 @@ public class LocalTransportThreadModelTest {
             if (t == null) {
                 this.t = Thread.currentThread();
             } else {
-                assertSame(t, Thread.currentThread());
+                Assert.assertSame(t, Thread.currentThread());
             }
 
             ByteBuf m = (ByteBuf) msg;
@@ -490,7 +469,7 @@ public class LocalTransportThreadModelTest {
             for (int j = 0; j < count; j ++) {
                 int actual = m.readInt();
                 int expected = inCnt ++;
-                assertEquals(expected, actual);
+                Assert.assertEquals(expected, actual);
                 ctx.fireChannelRead(actual);
             }
             m.release();
@@ -498,12 +477,12 @@ public class LocalTransportThreadModelTest {
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            assertSame(t, Thread.currentThread());
+            Assert.assertSame(t, Thread.currentThread());
 
             ByteBuf out = ctx.alloc().buffer(4);
             int m = (Integer) msg;
             int expected = outCnt ++;
-            assertEquals(expected, m);
+            Assert.assertEquals(expected, m);
             out.writeInt(m);
 
             ctx.write(out, promise);
@@ -534,23 +513,23 @@ public class LocalTransportThreadModelTest {
             if (t == null) {
                 this.t = Thread.currentThread();
             } else {
-                assertSame(t, Thread.currentThread());
+                Assert.assertSame(t, Thread.currentThread());
             }
 
             int actual = (Integer) msg;
             int expected = inCnt ++;
-            assertEquals(expected, actual);
+            Assert.assertEquals(expected, actual);
 
             ctx.fireChannelRead(msg);
         }
 
         @Override
         public void write(ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            assertSame(t, Thread.currentThread());
+            Assert.assertSame(t, Thread.currentThread());
 
             int actual = (Integer) msg;
             int expected = outCnt ++;
-            assertEquals(expected, actual);
+            Assert.assertEquals(expected, actual);
 
             ctx.write(msg, promise);
         }
@@ -580,22 +559,22 @@ public class LocalTransportThreadModelTest {
             if (t == null) {
                 this.t = Thread.currentThread();
             } else {
-                assertSame(t, Thread.currentThread());
+                Assert.assertSame(t, Thread.currentThread());
             }
 
             int actual = (Integer) msg;
             int expected = inCnt ++;
-            assertEquals(expected, actual);
+            Assert.assertEquals(expected, actual);
         }
 
         @Override
         public void write(
                 ChannelHandlerContext ctx, Object msg, ChannelPromise promise) throws Exception {
-            assertSame(t, Thread.currentThread());
+            Assert.assertSame(t, Thread.currentThread());
 
             int actual = (Integer) msg;
             int expected = outCnt ++;
-            assertEquals(expected, actual);
+            Assert.assertEquals(expected, actual);
             ctx.write(msg, promise);
         }
 

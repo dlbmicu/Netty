@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -20,22 +20,15 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.util.CharsetUtil;
 import io.netty.util.ReferenceCountUtil;
-import io.netty.util.internal.PlatformDependent;
-import org.apache.commons.compress.utils.IOUtils;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.Arrays;
 import java.util.Queue;
-import java.util.zip.GZIPOutputStream;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 
 public class JdkZlibTest extends ZlibTest {
@@ -46,19 +39,14 @@ public class JdkZlibTest extends ZlibTest {
     }
 
     @Override
-    protected ZlibDecoder createDecoder(ZlibWrapper wrapper, int maxAllocation) {
-        return new JdkZlibDecoder(wrapper, maxAllocation);
+    protected ZlibDecoder createDecoder(ZlibWrapper wrapper) {
+        return new JdkZlibDecoder(wrapper);
     }
 
-    @Test
+    @Test(expected = DecompressionException.class)
     @Override
     public void testZLIB_OR_NONE3() throws Exception {
-        assertThrows(DecompressionException.class, new Executable() {
-            @Override
-            public void execute() throws Throwable {
-                JdkZlibTest.super.testZLIB_OR_NONE3();
-            }
-        });
+        super.testZLIB_OR_NONE3();
     }
 
     @Test
@@ -67,7 +55,7 @@ public class JdkZlibTest extends ZlibTest {
         EmbeddedChannel chDecoderGZip = new EmbeddedChannel(createDecoder(ZlibWrapper.GZIP));
 
         try {
-            byte[] bytes = IOUtils.toByteArray(getClass().getResourceAsStream("/multiple.gz"));
+            byte[] bytes = toByteArray(getClass().getResourceAsStream("/multiple.gz"));
 
             assertTrue(chDecoderGZip.writeInbound(Unpooled.copiedBuffer(bytes)));
             Queue<Object> messages = chDecoderGZip.inboundMessages();
@@ -87,7 +75,7 @@ public class JdkZlibTest extends ZlibTest {
         EmbeddedChannel chDecoderGZip = new EmbeddedChannel(new JdkZlibDecoder(true));
 
         try {
-            byte[] bytes = IOUtils.toByteArray(getClass().getResourceAsStream("/multiple.gz"));
+            byte[] bytes = toByteArray(getClass().getResourceAsStream("/multiple.gz"));
 
             assertTrue(chDecoderGZip.writeInbound(Unpooled.copiedBuffer(bytes)));
             Queue<Object> messages = chDecoderGZip.inboundMessages();
@@ -104,64 +92,18 @@ public class JdkZlibTest extends ZlibTest {
         }
     }
 
-    @Test
-    public void testConcatenatedStreamsReadFullyWhenFragmented() throws IOException {
-        EmbeddedChannel chDecoderGZip = new EmbeddedChannel(new JdkZlibDecoder(true));
-
+    private static byte[] toByteArray(InputStream in) throws IOException {
         try {
-            byte[] bytes = IOUtils.toByteArray(getClass().getResourceAsStream("/multiple.gz"));
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] array = new byte[1024];
 
-            // Let's feed the input byte by byte to simulate fragmentation.
-            ByteBuf buf = Unpooled.copiedBuffer(bytes);
-            boolean written = false;
-            while (buf.isReadable()) {
-                written |= chDecoderGZip.writeInbound(buf.readRetainedSlice(1));
+            int read;
+            while ((read = in.read(array)) != -1) {
+                out.write(array, 0, read);
             }
-            buf.release();
-
-            assertTrue(written);
-            Queue<Object> messages = chDecoderGZip.inboundMessages();
-            assertEquals(2, messages.size());
-
-            for (String s : Arrays.asList("a", "b")) {
-                ByteBuf msg = (ByteBuf) messages.poll();
-                assertEquals(s, msg.toString(CharsetUtil.UTF_8));
-                ReferenceCountUtil.release(msg);
-            }
+            return out.toByteArray();
         } finally {
-            assertFalse(chDecoderGZip.finish());
-            chDecoderGZip.close();
+            in.close();
         }
-    }
-
-    @Test
-    public void testDecodeWithHeaderFollowingFooter() throws Exception {
-        byte[] bytes = new byte[1024];
-        PlatformDependent.threadLocalRandom().nextBytes(bytes);
-        ByteArrayOutputStream bytesOut = new ByteArrayOutputStream();
-        GZIPOutputStream out = new GZIPOutputStream(bytesOut);
-        out.write(bytes);
-        out.close();
-
-        byte[] compressed = bytesOut.toByteArray();
-        ByteBuf buffer = Unpooled.buffer().writeBytes(compressed).writeBytes(compressed);
-        EmbeddedChannel channel = new EmbeddedChannel(new JdkZlibDecoder(ZlibWrapper.GZIP, true));
-        // Write it into the Channel in a way that we were able to decompress the first data completely but not the
-        // whole footer.
-        assertTrue(channel.writeInbound(buffer.readRetainedSlice(compressed.length - 1)));
-        assertTrue(channel.writeInbound(buffer));
-        assertTrue(channel.finish());
-
-        ByteBuf uncompressedBuffer = Unpooled.wrappedBuffer(bytes);
-        ByteBuf read = channel.readInbound();
-        assertEquals(uncompressedBuffer, read);
-        read.release();
-
-        read = channel.readInbound();
-        assertEquals(uncompressedBuffer, read);
-        read.release();
-
-        assertNull(channel.readInbound());
-        uncompressedBuffer.release();
     }
 }

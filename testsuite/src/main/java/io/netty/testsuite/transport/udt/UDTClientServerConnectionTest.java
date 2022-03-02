@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -35,19 +35,14 @@ import io.netty.util.CharsetUtil;
 import io.netty.util.NetUtil;
 import io.netty.util.concurrent.DefaultThreadFactory;
 import io.netty.util.concurrent.GlobalEventExecutor;
-import io.netty.util.internal.PlatformDependent;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.Test;
+import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.InetSocketAddress;
 import java.util.concurrent.ThreadFactory;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeFalse;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import static org.junit.Assert.*;
 
 /**
  * Verify UDT connect/disconnect life cycle.
@@ -338,22 +333,6 @@ public class UDTClientServerConnectionTest {
     static final int WAIT_COUNT = 50;
     static final int WAIT_SLEEP = 100;
 
-    @BeforeAll
-    public static void assumeUdt() {
-        assumeTrue(canLoadAndInit(), "com.barchart.udt.SocketUDT can not be loaded and initialized");
-        assumeFalse(PlatformDependent.isJ9Jvm(), "Not supported on J9 JVM");
-    }
-
-    private static boolean canLoadAndInit() {
-        try {
-            Class.forName("com.barchart.udt.SocketUDT", true,
-                    UDTClientServerConnectionTest.class.getClassLoader());
-            return true;
-        } catch (Throwable e) {
-            return false;
-        }
-    }
-
     /**
      * Verify UDT client/server connect and disconnect.
      */
@@ -379,7 +358,7 @@ public class UDTClientServerConnectionTest {
         server.waitForActive(true);
 
         log.info("Verify connection is active.");
-        assertEquals(1, server.group.size(), "group must have one");
+        assertEquals("group must have one", 1, server.group.size());
 
         log.info("Stopping client.");
         client.shutdown();
@@ -391,7 +370,7 @@ public class UDTClientServerConnectionTest {
         server.waitForActive(false);
 
         log.info("Verify connection is inactive.");
-        assertEquals(0, server.group.size(), "group must be empty");
+        assertEquals("group must be empty", 0, server.group.size());
 
         log.info("Stopping server.");
         server.shutdown();

@@ -5,7 +5,7 @@
  * version 2.0 (the "License"); you may not use this file except in compliance
  * with the License. You may obtain a copy of the License at:
  *
- *   https://www.apache.org/licenses/LICENSE-2.0
+ *   http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
@@ -16,14 +16,11 @@
 
 package io.netty.util.internal;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.function.Executable;
+import org.junit.Test;
 
 import java.util.Date;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.Assert.*;
 
 public class TypeParameterMatcherTest {
 
@@ -41,14 +38,9 @@ public class TypeParameterMatcherTest {
         assertFalse(m.match(new CC()));
     }
 
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testUnsolvedParameter() throws Exception {
-        assertThrows(IllegalStateException.class, new Executable() {
-            @Override
-            public void execute() {
-                TypeParameterMatcher.find(new TypeQ(), TypeX.class, "B");
-            }
-        });
+        TypeParameterMatcher.find(new TypeQ(), TypeX.class, "B");
     }
 
     @Test
@@ -143,15 +135,10 @@ public class TypeParameterMatcherTest {
         T t;
     }
 
-    @Test
+    @Test(expected = IllegalStateException.class)
     public void testErasure() throws Exception {
-        assertThrows(IllegalStateException.class, new Executable() {
-            @Override
-            public void execute() {
-                TypeParameterMatcher m = TypeParameterMatcher.find(new X<String, Date>(), W.class, "E");
-                assertTrue(m.match(new Date()));
-                assertFalse(m.match(new Object()));
-            }
-        });
+        TypeParameterMatcher m = TypeParameterMatcher.find(new X<String, Date>(), W.class, "E");
+        assertTrue(m.match(new Date()));
+        assertFalse(m.match(new Object()));
     }
 }
